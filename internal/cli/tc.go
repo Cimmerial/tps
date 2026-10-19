@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Cimmerial/tps/internal/config"
 	"github.com/Cimmerial/tps/internal/jobs"
 	"github.com/Cimmerial/tps/internal/ui"
 )
@@ -38,6 +39,8 @@ func parseTerminalCheck(fields []string) (MenuInput, error) {
 				in.TcKillID = id
 				i++
 			}
+		case "-r", "--r", "-restart", "--restart":
+			in.TcRestart = true
 		default:
 			return MenuInput{}, fmt.Errorf("tc: unknown flag %q", fields[i])
 		}
@@ -64,7 +67,7 @@ func printTerminalJobs(projectID string) error {
 		return err
 	}
 	if len(list) == 0 {
-		fmt.Println(ui.Dim("no terminals running (tc -k N to stop one)"))
+		fmt.Println(ui.Dim("no terminals running (tck · tc -k 1)"))
 		return nil
 	}
 	fmt.Println(ui.Bold("TERMINALS:"))
@@ -78,13 +81,24 @@ func printTerminalJobs(projectID string) error {
 			ui.Dim(truncateRunes(j.Shell, 40)),
 		)
 	}
-	fmt.Println(ui.Dim("tc -k · tc -k 1"))
+	fmt.Println(ui.Dim("tck · tc -k 1 · tcr"))
 	return nil
 }
 
-func runTerminalCheck(projectID string, in MenuInput) error {
+func runTerminalCheck(p *config.Project, in MenuInput) error {
+	if in.TcRestart {
+		started, err := jobs.RestartAll(p)
+		if err != nil {
+			return err
+		}
+		for _, job := range started {
+			watchCaptureIfNeeded(p, job)
+		}
+		fmt.Println(ui.Green(fmt.Sprintf("restarted %d terminal(s)", len(started))))
+		return nil
+	}
 	if in.TcKillAll {
-		n, err := jobs.KillAll(projectID)
+		n, err := jobs.KillAll(p.ID)
 		if err != nil {
 			return err
 		}
@@ -92,12 +106,26 @@ func runTerminalCheck(projectID string, in MenuInput) error {
 		return nil
 	}
 	if in.TcKillID > 0 {
-		n, err := jobs.Kill(projectID, in.TcKillID)
+		n, err := jobs.Kill(p.ID, in.TcKillID)
 		if err != nil {
 			return err
 		}
 		fmt.Println(ui.Green(fmt.Sprintf("stopped %d terminal(s)", n)))
 		return nil
 	}
-	return printTerminalJobs(projectID)
+	return printTerminalJobs(p.ID)
+}
+
+func watchCaptureIfNeeded(p *config.Project, job jobs.Job) {
+	cmd := p.FindCommand(job.Alias)
+	if cmd == nil || cmd.Capture == "" {
+		return
+	}
+	logPath, err := jobs.LogFile(p.ID, job.ID)
+	if err != nil {
+		return
+	}
+	pattern := config.ResolveCapturePattern(cmd.Capture)
+	fmt.Println(ui.Dim("watching output for link…"))
+	go jobs.WatchCapture(logPath, pattern, 90*time.Second)
 }

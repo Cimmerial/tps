@@ -6,7 +6,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Cimmerial/tps/internal/config"
 	gittool "github.com/Cimmerial/tps/internal/git"
@@ -112,7 +111,7 @@ func runInteractive() error {
 			return err
 		}
 
-		input, err := resolveMenuInput(selected, line)
+		input, err := resolveMenuInput(cfg, selected, line)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			continue
@@ -166,7 +165,12 @@ func runInteractive() error {
 		case ActionUpdate:
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
-			if err := update.InstallAndRestart(selected.Path, input.UpdateAll); err != nil {
+			root := devRepoRoot(cfg, selected)
+			if root == "" {
+				fmt.Fprintf(os.Stderr, "update: link the tps dev repo first (tps project add from the tps repo)\n")
+				continue
+			}
+			if err := update.InstallAndRestart(root, input.UpdateAll); err != nil {
 				fmt.Fprintf(os.Stderr, "update: %v\n", err)
 			}
 		case ActionEdit:
@@ -215,7 +219,7 @@ func runInteractive() error {
 		case ActionTerminalCheck:
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
-			if err := runTerminalCheck(projectID, input); err != nil {
+			if err := runTerminalCheck(selected, input); err != nil {
 				fmt.Fprintf(os.Stderr, "tc: %v\n", err)
 			}
 		case ActionRun:
@@ -227,16 +231,7 @@ func runInteractive() error {
 					continue
 				}
 				fmt.Println(ui.Green(fmt.Sprintf("started #%d in new terminal (%s)", job.ID, job.Alias)))
-				if cmd.Capture != "" {
-					logPath, err := jobs.LogFile(selected.ID, job.ID)
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "%s\n", ui.Dim("capture: "+err.Error()))
-					} else {
-						pattern := config.ResolveCapturePattern(cmd.Capture)
-						fmt.Println(ui.Dim("watching output for link…"))
-						go jobs.WatchCapture(logPath, pattern, 90*time.Second)
-					}
-				}
+				watchCaptureIfNeeded(selected, job)
 				selected.RecordCommandUse(input.Alias)
 				if err := config.Save(cfg); err != nil {
 					fmt.Fprintf(os.Stderr, "could not save usage: %v\n", err)
@@ -256,7 +251,7 @@ func runInteractive() error {
 			if err := config.Save(cfg); err != nil {
 				fmt.Fprintf(os.Stderr, "could not save usage: %v\n", err)
 			}
-			if strings.EqualFold(input.Alias, "update") && canSelfUpdate(selected.Path) {
+			if strings.EqualFold(input.Alias, "update") && devRepoRoot(cfg, selected) != "" {
 				if err := update.RestartInteractive(true); err != nil {
 					fmt.Fprintf(os.Stderr, "restart: %v\n", err)
 				}

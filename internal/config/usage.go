@@ -2,7 +2,7 @@ package config
 
 import "sort"
 
-const TopCommandSlots = 3
+const TopCommandSlots = 6
 
 type rankedCommand struct {
 	Command Command

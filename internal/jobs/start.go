@@ -11,6 +11,10 @@ import (
 )
 
 func Start(p *config.Project, alias string) (Job, error) {
+	return launch(p, alias, true)
+}
+
+func launch(p *config.Project, alias string, recordHistory bool) (Job, error) {
 	cmd := p.FindCommand(alias)
 	if cmd == nil {
 		return Job{}, fmt.Errorf("unknown command %q", alias)
@@ -24,7 +28,17 @@ func Start(p *config.Project, alias string) (Job, error) {
 	if err != nil {
 		return Job{}, err
 	}
+	ttyPath, err := TTYFile(p.ID, id)
+	if err != nil {
+		return Job{}, err
+	}
+	pgidPath, err := PGIDFile(p.ID, id)
+	if err != nil {
+		return Job{}, err
+	}
 	_ = os.Remove(pidPath)
+	_ = os.Remove(ttyPath)
+	_ = os.Remove(pgidPath)
 
 	logPath := ""
 	if cmd.Capture != "" {
@@ -35,19 +49,26 @@ func Start(p *config.Project, alias string) (Job, error) {
 		_ = os.Remove(logPath)
 	}
 
-	if err := spawnInTerminal(p.Path, cmd.Shell, pidPath, logPath); err != nil {
+	if err := spawnInTerminal(p.Path, cmd.Shell, pidPath, logPath, ttyPath); err != nil {
 		return Job{}, err
 	}
 
 	pid := 0
-	for i := 0; i < 40; i++ {
+	tty := ""
+	for i := 0; i < 60; i++ {
 		time.Sleep(50 * time.Millisecond)
-		data, err := os.ReadFile(pidPath)
-		if err == nil {
-			pid = parsePID(string(data))
-			if pid > 0 {
-				break
+		if pid == 0 {
+			if data, err := os.ReadFile(pidPath); err == nil {
+				pid = parsePID(string(data))
 			}
+		}
+		if tty == "" {
+			if data, err := os.ReadFile(ttyPath); err == nil {
+				tty = strings.TrimSpace(string(data))
+			}
+		}
+		if pid > 0 && tty != "" {
+			break
 		}
 	}
 	if pid == 0 {
@@ -59,10 +80,16 @@ func Start(p *config.Project, alias string) (Job, error) {
 		Alias:   alias,
 		Shell:   cmd.Shell,
 		PID:     pid,
+		TTY:     tty,
 		Started: time.Now(),
 	}
 	if err := Add(p.ID, job); err != nil {
 		return Job{}, err
+	}
+	if recordHistory {
+		if err := appendHistory(p.ID, alias); err != nil {
+			return job, err
+		}
 	}
 	return job, nil
 }

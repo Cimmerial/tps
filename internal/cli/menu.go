@@ -39,6 +39,7 @@ type MenuInput struct {
 	NewCmd      config.Command
 	TcKillAll   bool
 	TcKillID    int
+	TcRestart   bool
 }
 
 func commandDetail(c config.Command) string {
@@ -108,13 +109,14 @@ func printFullHelp(p *config.Project) {
 				{"config", "c", "open config.yaml in Cursor/VS Code or $EDITOR"},
 				{"edit", "e", "change a command shell (e hello)"},
 				{"new command", "nc", "nc -n name -a abbrev -c shell (-t terminal, -m capture)"},
-				{"terminals", "tc", "tc · tc -k · tc -k 1"},
+				{"terminals", "tc", "tc · tck · tc -k 1 · tcr"},
 				{"shell tips", "", "chain with && or use YAML | for multiple lines"},
 			},
 		},
 	}
 
-	if canSelfUpdate(p.Path) {
+	cfg, _ := config.Load()
+	if devRepoRoot(cfg, p) != "" {
 		sections = append(sections, helpSection{
 			title: "update",
 			rows: []helpRow{
@@ -244,7 +246,7 @@ func canSelfUpdate(projectRoot string) bool {
 	return err == nil
 }
 
-func resolveMenuInput(p *config.Project, line string) (MenuInput, error) {
+func resolveMenuInput(cfg *config.Config, p *config.Project, line string) (MenuInput, error) {
 	line = strings.TrimSpace(line)
 	if line == "" {
 		return MenuInput{Action: ActionNoop}, nil
@@ -291,6 +293,12 @@ func resolveMenuInput(p *config.Project, line string) (MenuInput, error) {
 	}
 
 	if fields := strings.Fields(line); len(fields) >= 1 {
+		switch strings.ToLower(fields[0]) {
+		case "tck":
+			return MenuInput{Action: ActionTerminalCheck, TcKillAll: true}, nil
+		case "tcr":
+			return MenuInput{Action: ActionTerminalCheck, TcRestart: true}, nil
+		}
 		if strings.EqualFold(fields[0], "tc") || (len(fields) >= 2 && strings.EqualFold(fields[0], "terminal") && strings.EqualFold(fields[1], "check")) {
 			return parseTerminalCheck(fields)
 		}
@@ -304,8 +312,8 @@ func resolveMenuInput(p *config.Project, line string) (MenuInput, error) {
 			return MenuInput{Action: ActionInstallHelp, InstallCopy: copyClip}, nil
 		}
 		if strings.EqualFold(fields[0], "u") || strings.EqualFold(fields[0], "update") {
-			if !canSelfUpdate(p.Path) {
-				return MenuInput{}, fmt.Errorf("update only works in a repo with cmd/tps")
+			if devRepoRoot(cfg, p) == "" {
+				return MenuInput{}, fmt.Errorf("update needs the tps dev repo linked (tps project add from the tps repo)")
 			}
 			all := false
 			for _, f := range fields[1:] {

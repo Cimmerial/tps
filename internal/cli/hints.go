@@ -27,10 +27,16 @@ func builtInHints(p *config.Project) []hintEntry {
 		{key: "edit", abbr: "e", label: "edit", order: 5, show: func(*config.Project) bool { return true }},
 		{key: "new_command", abbr: "nc", label: "new cmd", order: 5, show: func(*config.Project) bool { return true }},
 		{key: "config", abbr: "c", label: "config", order: 6, show: func(*config.Project) bool { return true }},
-		{key: "update", abbr: "u", label: "update", order: 7, show: func(p *config.Project) bool { return canSelfUpdate(p.Path) }},
+		{key: "update", abbr: "u", label: "update", order: 7, show: func(p *config.Project) bool {
+			cfg, err := config.Load()
+			if err != nil {
+				return canSelfUpdate(p.Path)
+			}
+			return devRepoRoot(cfg, p) != ""
+		}},
 		{key: "ship", abbr: "gs", label: "ship", order: 8, show: func(*config.Project) bool { return true }},
 		{key: "git", abbr: "git", label: "", order: 9, show: func(*config.Project) bool { return true }},
-		{key: "terminals", abbr: "tc", label: "terms", order: 10, show: func(*config.Project) bool { return true }},
+		{key: "terminals", abbr: "tc", label: "terminals", order: 10, show: func(*config.Project) bool { return true }},
 	}
 	out := make([]hintEntry, 0, len(all))
 	for _, h := range all {

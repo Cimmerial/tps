@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"syscall"
 	"time"
 
@@ -17,11 +18,13 @@ type Job struct {
 	Alias   string    `yaml:"alias"`
 	Shell   string    `yaml:"shell"`
 	PID     int       `yaml:"pid"`
+	TTY     string    `yaml:"tty,omitempty"`
 	Started time.Time `yaml:"started"`
 }
 
 type jobFile struct {
-	Jobs []Job `yaml:"jobs"`
+	Jobs    []Job    `yaml:"jobs"`
+	History []string `yaml:"history,omitempty"`
 }
 
 func jobsPath(projectID string) (string, error) {
@@ -32,26 +35,26 @@ func jobsPath(projectID string) (string, error) {
 	return filepath.Join(dir, "tps", "jobs", projectID+".yaml"), nil
 }
 
-func load(projectID string) ([]Job, error) {
+func readFile(projectID string) (jobFile, error) {
 	p, err := jobsPath(projectID)
 	if err != nil {
-		return nil, err
+		return jobFile{}, err
 	}
 	data, err := os.ReadFile(p)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, nil
+			return jobFile{}, nil
 		}
-		return nil, err
+		return jobFile{}, err
 	}
 	var f jobFile
 	if err := yaml.Unmarshal(data, &f); err != nil {
-		return nil, err
+		return jobFile{}, err
 	}
-	return f.Jobs, nil
+	return f, nil
 }
 
-func save(projectID string, jobs []Job) error {
+func writeFile(projectID string, f jobFile) error {
 	p, err := jobsPath(projectID)
 	if err != nil {
 		return err
@@ -59,7 +62,7 @@ func save(projectID string, jobs []Job) error {
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return err
 	}
-	data, err := yaml.Marshal(jobFile{Jobs: jobs})
+	data, err := yaml.Marshal(f)
 	if err != nil {
 		return err
 	}
@@ -75,18 +78,19 @@ func alive(pid int) bool {
 }
 
 func Reap(projectID string) ([]Job, error) {
-	jobs, err := load(projectID)
+	f, err := readFile(projectID)
 	if err != nil {
 		return nil, err
 	}
-	kept := make([]Job, 0, len(jobs))
-	for _, j := range jobs {
+	kept := make([]Job, 0, len(f.Jobs))
+	for _, j := range f.Jobs {
 		if alive(j.PID) {
 			kept = append(kept, j)
 		}
 	}
-	if len(kept) != len(jobs) {
-		if err := save(projectID, kept); err != nil {
+	if len(kept) != len(f.Jobs) {
+		f.Jobs = kept
+		if err := writeFile(projectID, f); err != nil {
 			return kept, err
 		}
 	}
@@ -104,13 +108,30 @@ func nextID(jobs []Job) int {
 	return max + 1
 }
 
-func Add(projectID string, job Job) error {
-	jobs, err := load(projectID)
+func appendHistory(projectID, alias string) error {
+	f, err := readFile(projectID)
 	if err != nil {
 		return err
 	}
-	jobs = append(jobs, job)
-	return save(projectID, jobs)
+	f.History = append(f.History, alias)
+	return writeFile(projectID, f)
+}
+
+func LaunchHistory(projectID string) ([]string, error) {
+	f, err := readFile(projectID)
+	if err != nil {
+		return nil, err
+	}
+	return f.History, nil
+}
+
+func Add(projectID string, job Job) error {
+	f, err := readFile(projectID)
+	if err != nil {
+		return err
+	}
+	f.Jobs = append(f.Jobs, job)
+	return writeFile(projectID, f)
 }
 
 func Kill(projectID string, id int) (int, error) {
@@ -121,13 +142,16 @@ func Kill(projectID string, id int) (int, error) {
 	if id == 0 {
 		return killAll(projectID, jobs)
 	}
+	f, err := readFile(projectID)
+	if err != nil {
+		return 0, err
+	}
 	var kept []Job
 	killed := 0
 	for _, j := range jobs {
 		if j.ID == id {
-			if terminate(j.PID) {
-				killed++
-			}
+			stopJob(projectID, j)
+			killed++
 			continue
 		}
 		kept = append(kept, j)
@@ -135,7 +159,8 @@ func Kill(projectID string, id int) (int, error) {
 	if killed == 0 {
 		return 0, fmt.Errorf("no terminal job #%d", id)
 	}
-	return killed, save(projectID, kept)
+	f.Jobs = kept
+	return killed, writeFile(projectID, f)
 }
 
 func KillAll(projectID string) (int, error) {
@@ -149,31 +174,51 @@ func KillAll(projectID string) (int, error) {
 func killAll(projectID string, jobs []Job) (int, error) {
 	killed := 0
 	for _, j := range jobs {
-		if terminate(j.PID) {
+		if stopJob(projectID, j) {
 			killed++
 		}
 	}
-	if err := save(projectID, nil); err != nil {
+	f, err := readFile(projectID)
+	if err != nil {
+		return killed, err
+	}
+	f.Jobs = nil
+	if err := writeFile(projectID, f); err != nil {
 		return killed, err
 	}
 	return killed, nil
 }
 
-func terminate(pid int) bool {
-	if pid <= 0 {
-		return false
-	}
-	if !alive(pid) {
-		return false
-	}
-	_ = syscall.Kill(pid, syscall.SIGTERM)
-	_ = syscall.Kill(-pid, syscall.SIGTERM)
-	time.Sleep(120 * time.Millisecond)
-	if alive(pid) {
-		_ = syscall.Kill(pid, syscall.SIGKILL)
-		_ = syscall.Kill(-pid, syscall.SIGKILL)
-	}
+func stopJob(projectID string, j Job) bool {
+	killJob(projectID, j)
 	return true
+}
+
+func killJob(projectID string, j Job) {
+	tty := strings.TrimSpace(j.TTY)
+	if tty == "" {
+		if path, err := TTYFile(projectID, j.ID); err == nil {
+			if data, err := os.ReadFile(path); err == nil {
+				tty = strings.TrimSpace(string(data))
+			}
+		}
+	}
+	_, _ = killProcessTree(j.PID)
+	CloseTerminalTab(tty, JobWindowMarker(projectID, j.ID))
+	killPortsFromShell(j.Shell)
+	cleanupJobFiles(projectID, j.ID)
+}
+
+func cleanupJobFiles(projectID string, jobID int) {
+	if path, err := TTYFile(projectID, jobID); err == nil {
+		_ = os.Remove(path)
+	}
+	if path, err := PGIDFile(projectID, jobID); err == nil {
+		_ = os.Remove(path)
+	}
+	if path, err := PIDFile(projectID, jobID); err == nil {
+		_ = os.Remove(path)
+	}
 }
 
 func PIDFile(projectID string, id int) (string, error) {
@@ -182,4 +227,20 @@ func PIDFile(projectID string, id int) (string, error) {
 		return "", err
 	}
 	return filepath.Join(dir, "tps", "jobs", "pids", projectID+"-"+fmt.Sprint(id)+".pid"), nil
+}
+
+func TTYFile(projectID string, id int) (string, error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "tps", "jobs", "pids", projectID+"-"+fmt.Sprint(id)+".tty"), nil
+}
+
+func PGIDFile(projectID string, id int) (string, error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "tps", "jobs", "pids", projectID+"-"+fmt.Sprint(id)+".pgid"), nil
 }
