@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Cimmerial/tps/internal/config"
+	"github.com/Cimmerial/tps/internal/ide"
 	"github.com/Cimmerial/tps/internal/ui"
 	"github.com/Cimmerial/tps/internal/ui/logos"
 )
@@ -17,6 +18,7 @@ type prefSnapshot struct {
 	colorLabel     string
 	smsTo          string
 	smsShortcut    string
+	preferredIDE   string
 }
 
 func snapshotPreferences(p *config.Preferences) prefSnapshot {
@@ -27,6 +29,7 @@ func snapshotPreferences(p *config.Preferences) prefSnapshot {
 		colorLabel:     colorPrefLabel(p.ColorEnabled),
 		smsTo:          strings.TrimSpace(p.SMSTo),
 		smsShortcut:    strings.TrimSpace(p.SMSShortcut),
+		preferredIDE:   string(ide.NormalizeID(p.PreferredIDE)),
 	}
 }
 
@@ -53,6 +56,9 @@ func optionsSessionChanges(before, after prefSnapshot) []string {
 	}
 	if before.smsShortcut != after.smsShortcut {
 		lines = append(lines, formatPrefChange("sms_shortcut", prefDisplay(before.smsShortcut), prefDisplay(after.smsShortcut)))
+	}
+	if before.preferredIDE != after.preferredIDE {
+		lines = append(lines, formatPrefChange("default IDE", optionsPreferredIDELabel(ide.ID(before.preferredIDE)), optionsPreferredIDELabel(ide.ID(after.preferredIDE))))
 	}
 	return lines
 }
@@ -107,6 +113,7 @@ func runOptionsMenu(projectID string, statusTick int) error {
 			{Num: "2", Desc: ui.Dim("title card color")},
 			{Num: "3", Desc: ui.Dim("terminal colors")},
 			{Num: "4", Desc: optionsCaptureSMSRowDesc(prefs)},
+			{Num: "5", Desc: optionsPreferredIDERowDesc(prefs)},
 		})
 		fmt.Println()
 		printNumberedMenuRows([]numberedMenuRow{
@@ -147,6 +154,14 @@ func runOptionsMenu(projectID string, statusTick int) error {
 			}
 		case 4:
 			changed, err := optionsCaptureSMSMenu(prefs, projectID, statusTick)
+			if err != nil {
+				return err
+			}
+			if changed {
+				continue
+			}
+		case 5:
+			changed, err := optionsPreferredIDEMenu(prefs, projectID, statusTick)
 			if err != nil {
 				return err
 			}

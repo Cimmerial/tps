@@ -54,6 +54,15 @@ func TestResolveMenuInputProjectByIndex(t *testing.T) {
 	}
 }
 
+func TestResolveMenuInputOpenInIDE(t *testing.T) {
+	for _, line := range []string{"ide", "open in desired ide", "OPEN IDE"} {
+		in, err := resolveMenuInput(nil, &config.Project{}, line)
+		if err != nil || in.Action != ActionOpenInIDE {
+			t.Fatalf("%q: %+v err=%v", line, in, err)
+		}
+	}
+}
+
 func TestResolveMenuInputProjectBack(t *testing.T) {
 	in, err := resolveMenuInput(nil, &config.Project{}, "pb")
 	if err != nil {
@@ -83,5 +92,16 @@ func TestResolveMenuInputCommandWithShellInputs(t *testing.T) {
 	_, err = resolveMenuInput(nil, p, "ic -a -b -c")
 	if err == nil {
 		t.Fatal("expected too many inputs")
+	}
+}
+
+func TestResolveMenuInputInstallUtilities(t *testing.T) {
+	in, err := resolveMenuInput(nil, &config.Project{}, "iu")
+	if err != nil || in.Action != ActionInstallUtilities {
+		t.Fatalf("iu: %+v err=%v", in, err)
+	}
+	in, err = resolveMenuInput(nil, &config.Project{}, "install utilities")
+	if err != nil || in.Action != ActionInstallUtilities {
+		t.Fatalf("install utilities: %+v err=%v", in, err)
 	}
 }

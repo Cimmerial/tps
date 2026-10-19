@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"golang.org/x/term"
@@ -18,6 +19,11 @@ func ReadEditedLine(prompt string) (string, error) {
 
 // ReadEditedLineFunc is like ReadEditedLine but re-evaluates the prompt on each redraw (e.g. terminal count).
 func ReadEditedLineFunc(promptFn func() string) (string, error) {
+	return ReadEditedLineFuncHistory(promptFn, nil)
+}
+
+// ReadEditedLineFuncHistory is like ReadEditedLineFunc but supports up/down command history when history is non-nil.
+func ReadEditedLineFuncHistory(promptFn func() string, history *[]string) (string, error) {
 	if !stdinIsTTY() {
 		return readLineFallback(promptFn())
 	}
@@ -31,6 +37,8 @@ func ReadEditedLineFunc(promptFn func() string) (string, error) {
 	fmt.Print("\r\033[K" + promptFn())
 	buf := []rune{}
 	pos := 0
+	histIdx := -1
+	var histDraft string
 	in := bufio.NewReader(os.Stdin)
 
 	redraw := func() {
@@ -39,6 +47,17 @@ func ReadEditedLineFunc(promptFn func() string) (string, error) {
 		if tail > 0 {
 			fmt.Printf("\033[%dD", tail)
 		}
+	}
+
+	setBuf := func(s string) {
+		buf = []rune(s)
+		pos = len(buf)
+		redraw()
+	}
+
+	clearHistBrowse := func() {
+		histIdx = -1
+		histDraft = ""
 	}
 
 	endNotices := BeginPromptNotices(func(lines ...string) {
@@ -63,7 +82,9 @@ func ReadEditedLineFunc(promptFn func() string) (string, error) {
 		switch b {
 		case '\r', '\n':
 			fmt.Print("\r\033[K\n")
-			return string(buf), nil
+			line := string(buf)
+			appendLineHistory(history, line)
+			return line, nil
 		case 3: // Ctrl+C
 			fmt.Print("\r\033[K\n")
 			return "", fmt.Errorf("interrupted")
@@ -72,7 +93,16 @@ func ReadEditedLineFunc(promptFn func() string) (string, error) {
 				fmt.Print("\r\033[K\n")
 				return "", io.EOF
 			}
+		case 23: // Ctrl+W
+			clearHistBrowse()
+			start := moveWordLeft(buf, pos)
+			if start < pos {
+				buf = append(buf[:start], buf[pos:]...)
+				pos = start
+				redraw()
+			}
 		case 127, 8: // backspace / DEL
+			clearHistBrowse()
 			if pos > 0 {
 				buf = append(buf[:pos-1], buf[pos:]...)
 				pos--
@@ -84,32 +114,96 @@ func ReadEditedLineFunc(promptFn func() string) (string, error) {
 				return "", err
 			}
 			switch seq {
+			case "[A", "OA":
+				if history != nil && len(*history) > 0 {
+					if histIdx == -1 {
+						histDraft = string(buf)
+						histIdx = len(*history) - 1
+					} else if histIdx > 0 {
+						histIdx--
+					}
+					setBuf((*history)[histIdx])
+				}
+			case "[B", "OB":
+				if history != nil && histIdx != -1 {
+					if histIdx < len(*history)-1 {
+						histIdx++
+						setBuf((*history)[histIdx])
+					} else {
+						clearHistBrowse()
+						setBuf(histDraft)
+					}
+				}
 			case "[D", "OD":
+				clearHistBrowse()
 				if pos > 0 {
 					pos--
 					redraw()
 				}
 			case "[C", "OC":
+				clearHistBrowse()
 				if pos < len(buf) {
 					pos++
 					redraw()
 				}
+			case "[1;3D", "[1;5D":
+				clearHistBrowse()
+				pos = moveWordLeft(buf, pos)
+				redraw()
+			case "[1;3C", "[1;5C":
+				clearHistBrowse()
+				pos = moveWordRight(buf, pos)
+				redraw()
 			case "[3~":
+				clearHistBrowse()
 				if pos < len(buf) {
 					buf = append(buf[:pos], buf[pos+1:]...)
 					redraw()
 				}
+			case "[3;3~":
+				clearHistBrowse()
+				end := moveWordRight(buf, pos)
+				if end > pos {
+					buf = append(buf[:pos], buf[end:]...)
+					redraw()
+				}
 			case "[H", "[1~", "OH":
+				clearHistBrowse()
 				pos = 0
 				redraw()
 			case "[F", "[4~", "OF":
+				clearHistBrowse()
 				pos = len(buf)
 				redraw()
+			case "\x1bb":
+				clearHistBrowse()
+				pos = moveWordLeft(buf, pos)
+				redraw()
+			case "\x1bf":
+				clearHistBrowse()
+				pos = moveWordRight(buf, pos)
+				redraw()
+			case "\x1bd":
+				clearHistBrowse()
+				end := moveWordRight(buf, pos)
+				if end > pos {
+					buf = append(buf[:pos], buf[end:]...)
+					redraw()
+				}
+			case "\x1b\x7f", "\x1b\b":
+				clearHistBrowse()
+				start := moveWordLeft(buf, pos)
+				if start < pos {
+					buf = append(buf[:start], buf[pos:]...)
+					pos = start
+					redraw()
+				}
 			}
 		default:
 			if b < 32 {
 				continue
 			}
+			clearHistBrowse()
 			r, err := readUTF8Rune(in, b)
 			if err != nil {
 				return "", err
@@ -122,6 +216,48 @@ func ReadEditedLineFunc(promptFn func() string) (string, error) {
 			redraw()
 		}
 	}
+}
+
+func appendLineHistory(history *[]string, line string) {
+	if history == nil || line == "" {
+		return
+	}
+	if len(*history) > 0 && (*history)[len(*history)-1] == line {
+		return
+	}
+	*history = append(*history, line)
+}
+
+func isWordRune(r rune) bool {
+	return r == '_' || r == '-' || unicode.IsLetter(r) || unicode.IsDigit(r)
+}
+
+func moveWordLeft(buf []rune, pos int) int {
+	if pos == 0 {
+		return 0
+	}
+	i := pos - 1
+	for i > 0 && !isWordRune(buf[i]) {
+		i--
+	}
+	for i > 0 && isWordRune(buf[i-1]) {
+		i--
+	}
+	return i
+}
+
+func moveWordRight(buf []rune, pos int) int {
+	if pos >= len(buf) {
+		return len(buf)
+	}
+	i := pos
+	for i < len(buf) && !isWordRune(buf[i]) {
+		i++
+	}
+	for i < len(buf) && isWordRune(buf[i]) {
+		i++
+	}
+	return i
 }
 
 func readLineFallback(prompt string) (string, error) {

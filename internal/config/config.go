@@ -190,7 +190,7 @@ func (p *Project) AddCommand(cmd Command) error {
 			return nil
 		}
 	}
-	if cmd.Shell == "" && !cmd.HasAnyShellLine() && strings.TrimSpace(cmd.Handler) == "" {
+	if cmd.Shell == "" && !cmd.HasAnyShellLine() && strings.TrimSpace(cmd.Handler) == "" && strings.TrimSpace(cmd.Menu) == "" {
 		return errors.New("command shell is required")
 	}
 	p.Commands = append(p.Commands, cmd)

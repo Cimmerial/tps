@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/Cimmerial/tps/internal/addon"
 	"github.com/Cimmerial/tps/internal/config"
 	"github.com/Cimmerial/tps/internal/install"
 	"github.com/Cimmerial/tps/internal/instance"
@@ -122,6 +123,14 @@ func linkProjectAt(cfg *config.Config, linkDir, name string) (*config.Project, e
 	tpsRepo := instance.DevRepoRoot(cfg)
 	if _, err := instance.SyncProject(tpsRepo, linked.Path); err != nil {
 		return linked, err
+	}
+	if m, err := addon.LoadManifest(linked.Path); err == nil {
+		if err := addon.MergeManifestCommands(linked); err != nil {
+			return linked, err
+		}
+		addon.PrintContractWarnings(m)
+		_ = config.Save(cfg)
+		_ = buildUtilitiesBinary(linked.Path)
 	}
 	return linked, nil
 }

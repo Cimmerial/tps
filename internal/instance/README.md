@@ -23,6 +23,7 @@ Config lives in your OS user config dir (e.g. macOS `~/Library/Application Suppo
 | **`p`** | Switch linked project |
 | **`export` / `import`** | Backup or merge project YAML |
 | **`ih`** | Install / link / update help for this machine |
+| **`iu`** | Install **tps-utilities** addon (`h` → TPS ADDONS) |
 | **`u`** | Update tps (git pull + build if dev repo linked, else GitHub release) |
 | **`q`** | Quit (session stays in terminal) |
 

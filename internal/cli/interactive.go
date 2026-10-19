@@ -266,6 +266,18 @@ func runInteractive() error {
 			if err := runOptionsMenu(projectID, statusTick); err != nil {
 				fmt.Fprintf(os.Stderr, "options: %v\n", err)
 			}
+		case ActionOpenInIDE:
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
+			if err := runOpenInIDE(selected); err != nil {
+				fmt.Fprintf(os.Stderr, "ide: %v\n", err)
+			}
+		case ActionInstallUtilities:
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
+			if err := runInstallUtilities(cfg); err != nil {
+				fmt.Fprintf(os.Stderr, "install utilities: %v\n", err)
+			}
 		case ActionRun:
 			code, compactPrompt, err := executeProjectCommand(selected, input.Alias, input.ShellInputs)
 			if err != nil {

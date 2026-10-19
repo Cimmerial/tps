@@ -36,6 +36,8 @@ const (
 	ActionConfigExamples
 	ActionOptions
 	ActionCloseAllTerms
+	ActionInstallUtilities
+	ActionOpenInIDE
 )
 
 type MenuInput struct {
@@ -115,7 +117,8 @@ func printFullHelp(p *config.Project) {
 				cmdRow("quit", "q", "exit tps"),
 				cmdRow("project", "p · p1", "switch linked project (p1, p2, … or p name)"),
 				cmdRow("pb", "", "switch back to previous project"),
-				cmdRow("options", "o", "logo/color, terminal colors, capture sms"),
+				cmdRow("options", "o", "logo/color, terminal colors, capture sms, default IDE"),
+				cmdRow("open in desired ide", "ide", "open this project in Cursor/VS Code (or your default IDE)"),
 				cmdRow("close all terms", "vite", "macOS: kill tab processes and close every Terminal.app window"),
 			},
 		},
@@ -167,6 +170,7 @@ func printFullHelp(p *config.Project) {
 	printTPSCommandHelp(sections)
 	fmt.Println()
 	printHelpProjectCommands(p)
+	printAddonsHelpSection()
 }
 
 type helpRow struct {
@@ -397,6 +401,8 @@ func resolveMenuInput(cfg *config.Config, p *config.Project, line string) (MenuI
 		return MenuInput{Action: ActionSwitchProjectBack}, nil
 	case "o", "options":
 		return MenuInput{Action: ActionOptions}, nil
+	case "ide", "oi", "open ide", "open in ide", "open in desired ide":
+		return MenuInput{Action: ActionOpenInIDE}, nil
 	case "vite", "close all terms":
 		return MenuInput{Action: ActionCloseAllTerms}, nil
 	}
@@ -418,6 +424,9 @@ func resolveMenuInput(cfg *config.Config, p *config.Project, line string) (MenuI
 	}
 
 	if fields := strings.Fields(line); len(fields) >= 1 {
+		if in, ok, err := parseInstallUtilitiesInput(fields); ok {
+			return in, err
+		}
 		if len(fields) >= 2 && strings.EqualFold(fields[0], "tps") && strings.EqualFold(fields[1], "options") {
 			return MenuInput{Action: ActionOptions}, nil
 		}

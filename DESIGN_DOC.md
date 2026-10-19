@@ -109,6 +109,8 @@ Implementation: `internal/instance` embeds that doc into release binaries and wr
 4. **Config is source of truth** — projects heal by path/remote; usage sorts menus.
 5. **Don’t block the hub** — long servers run in other terminals; hub keeps accepting input.
 
+**Addons:** separate repos that link as projects; contract in [ADDONS.md](ADDONS.md). Help lists **TPS ADDONS** (`iu` / `install utilities`).
+
 ---
 
 ## Open goals / roadmap

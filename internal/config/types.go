@@ -27,6 +27,7 @@ type Command struct {
 	Tags        []string `yaml:"tags,omitempty"`    // first tag = menu folder (e.g. admin, git)
 	Precursor   string   `yaml:"precursor,omitempty"` // alias or abbrev of command to run first
 	Handler     string   `yaml:"handler,omitempty"`   // in-process builtin id (no shell)
+	Menu        string   `yaml:"menu,omitempty"`      // addon tree menu YAML (relative to project root)
 
 	shells *shellStore `yaml:"-"`
 }

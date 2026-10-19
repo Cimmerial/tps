@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Cimmerial/tps/internal/addonmenu"
 	"github.com/Cimmerial/tps/internal/config"
 	"github.com/Cimmerial/tps/internal/jobs"
 	"github.com/Cimmerial/tps/internal/runner"
@@ -16,6 +17,13 @@ import (
 // compactNextPrompt is true when capture output was printed (no extra blank line before prompt).
 func executeProjectCommand(p *config.Project, alias string, inputs []string) (int, bool, error) {
 	if handled, code, err := runDevBuiltin(p, alias, inputs); handled {
+		return code, false, err
+	}
+	if cmd := p.FindCommand(alias); cmd != nil && strings.TrimSpace(cmd.Menu) != "" {
+		if len(inputs) > 0 {
+			return 1, false, fmt.Errorf("command %q uses a menu; run it without -inputs", alias)
+		}
+		code, err := addonmenu.RunCommandMenu(p, cmd, readMenuLine)
 		return code, false, err
 	}
 	chain, err := p.CommandRunChain(alias)

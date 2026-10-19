@@ -19,6 +19,7 @@ type Preferences struct {
 	SMSTo              string `yaml:"sms_to,omitempty"`                // E.164 for capture SMS
 	SMSShortcut        string `yaml:"sms_shortcut,omitempty"`          // optional Shortcuts name (preferred over AppleScript)
 	SessionProjectID   string `yaml:"session_project_id,omitempty"`    // interactive session project (survives switch / restart)
+	PreferredIDE       string `yaml:"preferred_ide,omitempty"`         // cursor, vscode, auto, …
 }
 
 func PreferencesPath() (string, error) {

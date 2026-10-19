@@ -26,6 +26,7 @@ func (c *Command) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	c.Tags = parseTagsField(raw["tags"])
 	c.Precursor = stringField(raw, "precursor")
 	c.Handler = stringField(raw, "handler")
+	c.Menu = stringField(raw, "menu")
 
 	st := parseShellStore(raw)
 	if len(st.generic) > 0 || len(st.windows) > 0 || len(st.linux) > 0 || len(st.darwin) > 0 {
@@ -74,6 +75,9 @@ func (c Command) MarshalYAML() (interface{}, error) {
 	}
 	if strings.TrimSpace(c.Handler) != "" {
 		out["handler"] = strings.TrimSpace(c.Handler)
+	}
+	if strings.TrimSpace(c.Menu) != "" {
+		out["menu"] = strings.TrimSpace(c.Menu)
 	}
 	if c.shells != nil {
 		for k, v := range c.shells.marshalFields() {

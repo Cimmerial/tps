@@ -8,15 +8,17 @@ import (
 	"github.com/Cimmerial/tps/internal/ui"
 )
 
+var promptLineHistory []string
+
 func readLine(_ *bufio.Reader, projectID string, tick int, padBefore bool) (string, error) {
 	drainDetachedCompleteNotices()
 	if padBefore {
 		fmt.Print("\r\033[K\n")
 	}
-	line, err := ui.ReadEditedLineFunc(func() string {
+	line, err := ui.ReadEditedLineFuncHistory(func() string {
 		active, _ := jobs.Reap(projectID)
 		return ui.PromptBusy(len(active), tick)
-	})
+	}, &promptLineHistory)
 	if err != nil {
 		return "", err
 	}
