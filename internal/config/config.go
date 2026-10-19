@@ -116,12 +116,18 @@ func mergeProjectMeta(dst *Project, src Project) {
 	if len(src.CommandUsage) > 0 {
 		dst.CommandUsage = src.CommandUsage
 	}
+	if len(src.MetaUsage) > 0 {
+		dst.MetaUsage = src.MetaUsage
+	}
 }
 
 func (c *Config) UpsertProject(p Project) {
 	if existing := c.FindByID(p.ID); existing != nil {
 		if len(p.CommandUsage) == 0 {
 			p.CommandUsage = existing.CommandUsage
+		}
+		if len(p.MetaUsage) == 0 {
+			p.MetaUsage = existing.MetaUsage
 		}
 		mergeProjectMeta(existing, p)
 		return
@@ -132,6 +138,9 @@ func (c *Config) UpsertProject(p Project) {
 			if len(p.CommandUsage) == 0 {
 				p.CommandUsage = existing.CommandUsage
 			}
+			if len(p.MetaUsage) == 0 {
+				p.MetaUsage = existing.MetaUsage
+			}
 			mergeProjectMeta(existing, p)
 			return
 		}
@@ -140,6 +149,9 @@ func (c *Config) UpsertProject(p Project) {
 		p.ID = existing.ID
 		if len(p.CommandUsage) == 0 {
 			p.CommandUsage = existing.CommandUsage
+		}
+		if len(p.MetaUsage) == 0 {
+			p.MetaUsage = existing.MetaUsage
 		}
 		mergeProjectMeta(existing, p)
 		return

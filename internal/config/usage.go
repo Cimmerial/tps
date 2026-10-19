@@ -16,6 +16,23 @@ func (p *Project) RecordCommandUse(alias string) {
 	p.CommandUsage[alias]++
 }
 
+func (p *Project) RecordMetaUse(key string) {
+	if key == "" {
+		return
+	}
+	if p.MetaUsage == nil {
+		p.MetaUsage = map[string]int{}
+	}
+	p.MetaUsage[key]++
+}
+
+func (p *Project) MetaUseCount(key string) int {
+	if p.MetaUsage == nil {
+		return 0
+	}
+	return p.MetaUsage[key]
+}
+
 func (p *Project) ranked() []rankedCommand {
 	out := make([]rankedCommand, 0, len(p.Commands))
 	for _, c := range p.Commands {

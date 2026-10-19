@@ -11,6 +11,7 @@ type Project struct {
 	GitRemote    string         `yaml:"git_remote,omitempty"`
 	Commands     []Command      `yaml:"commands,omitempty"`
 	CommandUsage map[string]int `yaml:"command_usage,omitempty"`
+	MetaUsage    map[string]int `yaml:"meta_usage,omitempty"`
 }
 
 type Command struct {
@@ -18,4 +19,6 @@ type Command struct {
 	Abbrev      string `yaml:"-"`
 	Shell       string `yaml:"shell"`
 	Description string `yaml:"description,omitempty"`
+	Detach      bool   `yaml:"detach,omitempty"`
+	Capture     string `yaml:"capture,omitempty"` // regex or preset (trycloudflare) — detached + copy match
 }

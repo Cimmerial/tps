@@ -20,6 +20,7 @@ var rootCmd = &cobra.Command{
 
 // Execute is called from main.
 func Execute() error {
+	sessionRestartBanner = peelRestartFlagsFromArgv()
 	return rootCmd.Execute()
 }
 

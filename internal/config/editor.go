@@ -23,21 +23,17 @@ func OpenConfigInEditor() error {
 }
 
 func findGUIEditor() (bin string, args []string) {
-	if bin, args, ok := editorFromEnv(); ok {
-		return bin, args
-	}
-
 	candidates := []struct {
 		path string
 		args []string
 	}{
-		{"code", []string{"-w"}},
-		{"/usr/local/bin/code", []string{"-w"}},
-		{filepath.Join(os.Getenv("HOME"), "bin", "code"), []string{"-w"}},
-		{"/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code", []string{"-w"}},
-		{"cursor", []string{"-w"}},
-		{filepath.Join(os.Getenv("HOME"), "bin", "cursor"), []string{"-w"}},
-		{"/Applications/Cursor.app/Contents/Resources/app/bin/cursor", []string{"-w"}},
+		{"code", nil},
+		{"/usr/local/bin/code", nil},
+		{filepath.Join(os.Getenv("HOME"), "bin", "code"), nil},
+		{"/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code", nil},
+		{"cursor", nil},
+		{filepath.Join(os.Getenv("HOME"), "bin", "cursor"), nil},
+		{"/Applications/Cursor.app/Contents/Resources/app/bin/cursor", nil},
 	}
 
 	for _, c := range candidates {
@@ -76,12 +72,47 @@ func openInEditor(path string) error {
 		return runEditor(bin, append(args, path))
 	}
 	if runtime.GOOS == "darwin" {
-		return exec.Command("open", "-t", path).Run()
+		return runEditor("open", []string{"-t", path})
 	}
 	return runEditor("nano", []string{path})
 }
 
+func guiEditor(bin string) bool {
+	b := strings.ToLower(filepath.Base(bin))
+	if b == "open" {
+		return true
+	}
+	switch b {
+	case "code", "cursor", "codium", "windsurf":
+		return true
+	}
+	if strings.Contains(strings.ToLower(bin), "visual studio code") ||
+		strings.Contains(strings.ToLower(bin), "cursor.app") {
+		return true
+	}
+	return false
+}
+
+func withoutWaitFlags(args []string) []string {
+	out := make([]string, 0, len(args))
+	for _, a := range args {
+		if a == "-w" || a == "--wait" {
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
+}
+
 func runEditor(bin string, args []string) error {
+	if guiEditor(bin) {
+		args = withoutWaitFlags(args)
+		cmd := exec.Command(bin, args...)
+		if err := cmd.Start(); err != nil {
+			return fmt.Errorf("editor: %w", err)
+		}
+		return nil
+	}
 	cmd := exec.Command(bin, args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout

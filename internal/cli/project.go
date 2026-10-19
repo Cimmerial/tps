@@ -17,6 +17,8 @@ var projectCmd = &cobra.Command{
 	Short: "Manage projects",
 }
 
+var projectAddPath string
+
 var projectAddCmd = &cobra.Command{
 	Use:   "add [name]",
 	Short: "Link a project (default: current directory)",
@@ -29,15 +31,18 @@ var projectAddCmd = &cobra.Command{
 			return err
 		}
 
-		cwd, err := os.Getwd()
+		linkDir, err := os.Getwd()
 		if err != nil {
 			return err
+		}
+		if projectAddPath != "" {
+			linkDir = projectAddPath
 		}
 		name := ""
 		if len(args) > 0 {
 			name = args[0]
 		} else {
-			root, err := project.ProjectRootFromCwd(cwd)
+			root, err := project.ProjectRootFromCwd(linkDir)
 			if err != nil {
 				return err
 			}
@@ -45,12 +50,9 @@ var projectAddCmd = &cobra.Command{
 		}
 
 		spin = ui.NewSpinner("linking project")
-		linked, err := project.LinkFromCwd(cfg, cwd, name)
+		linked, err := linkProjectAt(cfg, linkDir, name)
 		spin.Stop()
 		if err != nil {
-			return err
-		}
-		if err := config.Save(cfg); err != nil {
 			return err
 		}
 		fmt.Printf("linked %q at %s", linked.Name, linked.Path)
@@ -193,6 +195,7 @@ func mutateProjectCommand(alias string, command config.Command, verb string) err
 }
 
 func init() {
+	projectAddCmd.Flags().StringVar(&projectAddPath, "path", "", "project directory to link (default: current directory)")
 	projectCmd.AddCommand(projectAddCmd, projectListCmd, projectCmdCmd)
 	projectCmdCmd.AddCommand(projectCmdAddCmd, projectCmdEditCmd, projectCmdRmCmd)
 }

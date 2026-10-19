@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/Cimmerial/tps/internal/ui"
 )
 
 func Run(dir string, args []string) (int, error) {
@@ -42,7 +44,7 @@ func Ship(dir, message string) (int, error) {
 	}
 
 	if stagedEmpty(dir) {
-		fmt.Println("nothing to commit")
+		fmt.Println(ui.Yellow("nothing to commit"))
 		return 0, nil
 	}
 
@@ -66,12 +68,12 @@ func Ship(dir, message string) (int, error) {
 
 func printShipOutcome(dir, message string) {
 	fmt.Println()
-	fmt.Printf("shipped — %s\n", message)
+	fmt.Printf("%s %s\n", ui.Green("shipped —"), ui.Bold(message))
 	if line := gitOutput(dir, "log", "-1", "--oneline"); line != "" {
-		fmt.Println(line)
+		fmt.Println(ui.Cyan(line))
 	}
 	if line := gitOutput(dir, "status", "-sb"); line != "" {
-		fmt.Println(line)
+		fmt.Println(ui.Dim(line))
 	}
 	fmt.Println()
 }

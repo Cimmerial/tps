@@ -7,8 +7,11 @@ import (
 	"syscall"
 )
 
+const flagUpdated = "--tps-updated"
+const flagUpToDate = "--tps-uptodate"
+
 // RestartInteractive replaces this process with a fresh tps invocation (same args).
-func RestartInteractive() error {
+func RestartInteractive(updated bool) error {
 	bin, err := exec.LookPath("tps")
 	if err != nil {
 		exe, err := os.Executable()
@@ -17,13 +20,19 @@ func RestartInteractive() error {
 		}
 		bin = exe
 	}
-	argv := make([]string, len(os.Args))
-	argv[0] = bin
+
+	argv := []string{bin}
 	for i := 1; i < len(os.Args); i++ {
-		argv[i] = os.Args[i]
+		a := os.Args[i]
+		if a == flagUpdated || a == flagUpToDate {
+			continue
+		}
+		argv = append(argv, a)
 	}
-	if len(argv) == 1 {
-		argv = []string{bin}
+	if updated {
+		argv = append(argv, flagUpdated)
+	} else {
+		argv = append(argv, flagUpToDate)
 	}
 	return syscall.Exec(bin, argv, os.Environ())
 }

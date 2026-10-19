@@ -8,6 +8,8 @@ func (c *Command) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		Description  string `yaml:"description,omitempty"`
 		Abbreviation string `yaml:"abbreviation,omitempty"`
 		Abbrev       string `yaml:"abbrev,omitempty"`
+		Detach       bool   `yaml:"detach,omitempty"`
+		Capture      string `yaml:"capture,omitempty"`
 	}
 	var r raw
 	if err := unmarshal(&r); err != nil {
@@ -20,6 +22,8 @@ func (c *Command) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if c.Abbrev == "" {
 		c.Abbrev = r.Abbrev
 	}
+	c.Detach = r.Detach
+	c.Capture = r.Capture
 	return nil
 }
 
@@ -30,11 +34,15 @@ func (c Command) MarshalYAML() (interface{}, error) {
 		Shell        string `yaml:"shell"`
 		Description  string `yaml:"description,omitempty"`
 		Abbreviation string `yaml:"abbreviation,omitempty"`
+		Detach       bool   `yaml:"detach,omitempty"`
+		Capture      string `yaml:"capture,omitempty"`
 	}
 	row := out{
 		Alias:       c.Alias,
 		Shell:       c.Shell,
 		Description: c.Description,
+		Detach:      c.Detach,
+		Capture:     c.Capture,
 	}
 	if c.Abbrev != "" {
 		row.Abbreviation = c.Abbrev

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Cimmerial/tps/internal/config"
+	"github.com/Cimmerial/tps/internal/ui"
 )
 
 type InputAction int
@@ -23,55 +24,72 @@ const (
 	ActionNoop
 	ActionGitShip
 	ActionGit
+	ActionSwitchProject
+	ActionInstallHelp
+	ActionNewCommand
+	ActionTerminalCheck
 )
 
 type MenuInput struct {
-	Action InputAction
-	Alias  string
-	Text   string
+	Action      InputAction
+	Alias       string
+	Text        string
+	UpdateAll   bool
+	InstallCopy bool
+	NewCmd      config.Command
+	TcKillAll   bool
+	TcKillID    int
 }
 
-func commandLabel(c config.Command) string {
+func commandDetail(c config.Command) string {
 	if c.Description != "" {
-		return c.Description
-	}
-	if c.Abbrev != "" {
-		return c.Abbrev
+		return truncateRunes(c.Description, 28)
 	}
 	return c.Alias
 }
 
-func printSessionHeader(p *config.Project) {
-	fmt.Printf("project: %s\n", p.Name)
+func formatProjectCmdEntry(c config.Command) string {
+	if c.Abbrev != "" {
+		return ui.Abbrev(c.Abbrev) + ui.Dim(" "+commandDetail(c))
+	}
+	return ui.Bold(commandDetail(c))
+}
+
+func truncateRunes(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	if max <= 3 {
+		return s[:max]
+	}
+	return s[:max-3] + "..."
+}
+
+func printSessionHeader(p *config.Project, restartBanner string) {
+	name := ui.Bold(ui.Magenta(p.Name))
+	switch restartBanner {
+	case "updated":
+		fmt.Printf("%s %s %s\n", ui.Dim("project:"), name, ui.Green("- tps updated"))
+	case "uptodate":
+		fmt.Printf("%s %s %s\n", ui.Dim("project:"), name, ui.Yellow("- already up to date"))
+	default:
+		fmt.Printf("%s %s\n", ui.Dim("project:"), name)
+	}
 	printCompactMenu(p)
 	printMenuHints(p)
 }
 
 func printCompactMenu(p *config.Project) {
 	top := p.TopCommands(config.TopCommandSlots)
-	var parts []string
-	for i, c := range top {
-		parts = append(parts, fmt.Sprintf("%d > %s", i+1, commandLabel(c)))
+	if len(top) == 0 {
+		return
 	}
-	if len(parts) > 0 {
-		fmt.Println(strings.Join(parts, "  "))
+	sep := ui.Dim(" · ")
+	parts := make([]string, 0, len(top))
+	for _, c := range top {
+		parts = append(parts, formatProjectCmdEntry(c))
 	}
-}
-
-func printMenuHints(p *config.Project) {
-	rest := len(p.Commands) - len(p.TopCommands(config.TopCommandSlots))
-	if rest < 0 {
-		rest = 0
-	}
-	hint := "h help · q quit · clear · edit · c config"
-	if rest > 0 {
-		hint = fmt.Sprintf("+%d more · %s", rest, hint)
-	}
-	if canSelfUpdate(p.Path) {
-		hint += " · u update"
-	}
-	hint += " · gs ship · git …"
-	fmt.Println(hint)
+	fmt.Printf("%s %s\n", ui.Bold("PRJCT CMDS:"), strings.Join(parts, sep))
 }
 
 func printFullHelp(p *config.Project) {
@@ -81,13 +99,16 @@ func printFullHelp(p *config.Project) {
 			rows: []helpRow{
 				{"clear", "tps", "reset screen and menu"},
 				{"quit", "q", "exit tps"},
+				{"project", "p", "switch linked project"},
 			},
 		},
 		{
 			title: "config",
 			rows: []helpRow{
 				{"config", "c", "open config.yaml in Cursor/VS Code or $EDITOR"},
-				{"edit", "", "change a command (prompts for shell)"},
+				{"edit", "e", "change a command shell (e hello)"},
+				{"new command", "nc", "nc -n name -a abbrev -c shell (-t terminal, -m capture)"},
+				{"terminals", "tc", "tc · tc -k · tc -k 1"},
 				{"shell tips", "", "chain with && or use YAML | for multiple lines"},
 			},
 		},
@@ -98,6 +119,7 @@ func printFullHelp(p *config.Project) {
 			title: "update",
 			rows: []helpRow{
 				{"update", "u", "go install ./cmd/tps and restart tps"},
+				{"update all", "u -a", "install and copy to every tps on PATH and ./tps"},
 			},
 		})
 	}
@@ -107,7 +129,7 @@ func printFullHelp(p *config.Project) {
 		rows: []helpRow{
 			{"ship", "gs", "add all, commit, push (gs your message here)"},
 			{"status", "", "git status"},
-			{"git …", "", "any git command (git diff, git log -1)"},
+			{"git", "", "git status; or git diff, git log -1, …"},
 		},
 	})
 
@@ -115,6 +137,8 @@ func printFullHelp(p *config.Project) {
 		title: "help",
 		rows: []helpRow{
 			{"help", "h", "this list"},
+			{"install", "ih", "install & update tps on this or another machine"},
+			{"install copy", "ih -copy", "copy install commands to clipboard"},
 		},
 	})
 
@@ -181,16 +205,38 @@ func printGroupedHelp(sections []helpSection) {
 		if i > 0 {
 			fmt.Println()
 		}
-		fmt.Printf("  %s\n", sec.title)
+		fmt.Printf("  %s\n", ui.Bold(ui.Cyan(sec.title)))
 		barLen := tableWidth
 		if len(sec.title) > barLen {
 			barLen = len(sec.title)
 		}
-		fmt.Printf("  %s\n", strings.Repeat("-", barLen))
+		fmt.Printf("  %s\n", ui.Dim(strings.Repeat("-", barLen)))
 		for _, r := range sec.rows {
-			fmt.Printf("  %-*s | %-*s | %s\n", maxCmd, r.command, maxAbbrev, r.abbrev, r.description)
+			cmdCol := ui.Bold(padPlain(r.command, maxCmd))
+			abbrPlain := padPlain(r.abbrev, maxAbbrev)
+			abbrCol := abbrPlain
+			if strings.TrimSpace(r.abbrev) != "" {
+				abbrCol = ui.Abbrev(padPlain(r.abbrev, maxAbbrev))
+			}
+			fmt.Printf("  %s | %s | %s\n", cmdCol, abbrCol, ui.Dim(r.description))
 		}
 	}
+}
+
+func isInstallHelpToken(tok string) bool {
+	switch strings.ToLower(tok) {
+	case "ih", "install", "install-help":
+		return true
+	default:
+		return false
+	}
+}
+
+func padPlain(s string, width int) string {
+	if len(s) >= width {
+		return s
+	}
+	return s + strings.Repeat(" ", width-len(s))
 }
 
 func canSelfUpdate(projectRoot string) bool {
@@ -218,15 +264,15 @@ func resolveMenuInput(p *config.Project, line string) (MenuInput, error) {
 	if low == "gs" {
 		return MenuInput{}, fmt.Errorf("gs needs a message (example: gs fix the menu)")
 	}
+	if low == "git" {
+		return MenuInput{Action: ActionGit, Text: "status"}, nil
+	}
 	if strings.HasPrefix(low, "git ") {
 		rest := strings.TrimSpace(line[3:])
 		if rest == "" {
-			return MenuInput{}, fmt.Errorf("git needs a subcommand (example: git status)")
+			return MenuInput{Action: ActionGit, Text: "status"}, nil
 		}
 		return MenuInput{Action: ActionGit, Text: rest}, nil
-	}
-	if c := p.FindCommandByAbbrev(line); c != nil {
-		return MenuInput{Action: ActionRun, Alias: c.Alias}, nil
 	}
 	switch low {
 	case "h", "help", "?":
@@ -235,22 +281,69 @@ func resolveMenuInput(p *config.Project, line string) (MenuInput, error) {
 		return MenuInput{Action: ActionClear}, nil
 	case "c", "config", "yaml":
 		return MenuInput{Action: ActionConfig}, nil
-	case "u", "update":
-		if canSelfUpdate(p.Path) {
-			return MenuInput{Action: ActionUpdate}, nil
-		}
-		return MenuInput{}, fmt.Errorf("update only works in a repo with cmd/tps")
+	case "p", "projects":
+		return MenuInput{Action: ActionSwitchProject}, nil
 	}
 
-	if strings.HasPrefix(low, "edit ") {
-		alias := strings.TrimSpace(line[5:])
-		if alias == "" {
+	if strings.HasPrefix(low, "p ") {
+		name := strings.TrimSpace(line[2:])
+		return MenuInput{Action: ActionSwitchProject, Text: name}, nil
+	}
+
+	if fields := strings.Fields(line); len(fields) >= 1 {
+		if strings.EqualFold(fields[0], "tc") || (len(fields) >= 2 && strings.EqualFold(fields[0], "terminal") && strings.EqualFold(fields[1], "check")) {
+			return parseTerminalCheck(fields)
+		}
+		if isInstallHelpToken(fields[0]) {
+			copyClip := false
+			for _, f := range fields[1:] {
+				if f == "-copy" || f == "--copy" {
+					copyClip = true
+				}
+			}
+			return MenuInput{Action: ActionInstallHelp, InstallCopy: copyClip}, nil
+		}
+		if strings.EqualFold(fields[0], "u") || strings.EqualFold(fields[0], "update") {
+			if !canSelfUpdate(p.Path) {
+				return MenuInput{}, fmt.Errorf("update only works in a repo with cmd/tps")
+			}
+			all := false
+			for _, f := range fields[1:] {
+				if f == "-a" || f == "--all" {
+					all = true
+				}
+			}
+			return MenuInput{Action: ActionUpdate, UpdateAll: all}, nil
+		}
+		if isNewCommandToken(fields[0]) || (len(fields) >= 2 && isNewCommandPhrase(fields[0], fields[1])) {
+			flagFields := fields[1:]
+			if len(fields) >= 2 && isNewCommandPhrase(fields[0], fields[1]) {
+				flagFields = fields[2:]
+			}
+			cmd, err := parseNewCommandFlags(flagFields)
+			if err != nil {
+				return MenuInput{}, err
+			}
+			return MenuInput{Action: ActionNewCommand, NewCmd: cmd}, nil
+		}
+	}
+
+	if fields := strings.Fields(line); len(fields) >= 1 && strings.EqualFold(fields[0], "e") {
+		if len(fields) == 1 {
 			return MenuInput{Action: ActionEdit}, nil
 		}
+		return MenuInput{Action: ActionEdit, Alias: strings.Join(fields[1:], " ")}, nil
+	}
+	if strings.HasPrefix(low, "edit ") {
+		alias := strings.TrimSpace(line[5:])
 		return MenuInput{Action: ActionEdit, Alias: alias}, nil
 	}
-	if low == "edit" {
+	if low == "edit" || low == "e" {
 		return MenuInput{Action: ActionEdit}, nil
+	}
+
+	if c := p.FindCommandByAbbrev(line); c != nil {
+		return MenuInput{Action: ActionRun, Alias: c.Alias}, nil
 	}
 
 	top := p.TopCommands(config.TopCommandSlots)
@@ -258,7 +351,7 @@ func resolveMenuInput(p *config.Project, line string) (MenuInput, error) {
 		if n >= 1 && n <= len(top) {
 			return MenuInput{Action: ActionRun, Alias: top[n-1].Alias}, nil
 		}
-		return MenuInput{}, fmt.Errorf("pick 1–%d, a name, or h (h for help)", len(top))
+		return MenuInput{}, fmt.Errorf("unknown input (h for help, or use a command abbrev)")
 	}
 
 	if c := p.FindCommand(line); c != nil {

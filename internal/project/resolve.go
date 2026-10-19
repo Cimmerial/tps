@@ -74,6 +74,7 @@ func LinkFromCwd(cfg *config.Config, cwd string, name string) (*config.Project, 
 			p.ID = existing.ID
 			p.Commands = existing.Commands
 			p.CommandUsage = existing.CommandUsage
+			p.MetaUsage = existing.MetaUsage
 		}
 	}
 	if p.ID == "" {
@@ -81,6 +82,7 @@ func LinkFromCwd(cfg *config.Config, cwd string, name string) (*config.Project, 
 			p.ID = existing.ID
 			p.Commands = existing.Commands
 			p.CommandUsage = existing.CommandUsage
+			p.MetaUsage = existing.MetaUsage
 		}
 	}
 	if p.ID == "" {

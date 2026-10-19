@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Cimmerial/tps/internal/config"
+	"github.com/Cimmerial/tps/internal/ui"
 )
 
 func runEditCommand(reader *bufio.Reader, cfg *config.Config, projectID string, alias string) error {
@@ -14,12 +15,19 @@ func runEditCommand(reader *bufio.Reader, cfg *config.Config, projectID string, 
 		return fmt.Errorf("project not found")
 	}
 	if len(p.Commands) == 0 {
-		return fmt.Errorf("no commands to edit")
+		return fmt.Errorf("no commands to edit (tps project cmd add <alias> <shell>)")
 	}
 
 	if alias == "" {
-		printFullHelp(p)
-		fmt.Print("edit alias> ")
+		fmt.Println(ui.Dim("pick alias to edit (or: e hello)"))
+		for _, c := range p.Commands {
+			line := c.Alias
+			if c.Abbrev != "" {
+				line = fmt.Sprintf("%s (%s)", c.Alias, c.Abbrev)
+			}
+			fmt.Printf("  %s\n", line)
+		}
+		fmt.Print(ui.Prompt())
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return err
@@ -30,19 +38,11 @@ func runEditCommand(reader *bufio.Reader, cfg *config.Config, projectID string, 
 		}
 	}
 
-	cmd := p.FindCommand(alias)
-	if cmd == nil {
-		for _, c := range p.Commands {
-			if strings.EqualFold(c.Alias, alias) {
-				cmd = &c
-				alias = c.Alias
-				break
-			}
-		}
-	}
+	cmd := resolveProjectCommand(p, alias)
 	if cmd == nil {
 		return fmt.Errorf("no command %q", alias)
 	}
+	alias = cmd.Alias
 
 	fmt.Printf("shell [%s]: ", cmd.Shell)
 	line, err := reader.ReadString('\n')
@@ -51,7 +51,7 @@ func runEditCommand(reader *bufio.Reader, cfg *config.Config, projectID string, 
 	}
 	shell := strings.TrimSpace(line)
 	if shell == "" {
-		fmt.Println("unchanged")
+		fmt.Println(ui.Dim("unchanged"))
 		return nil
 	}
 
@@ -64,5 +64,21 @@ func runEditCommand(reader *bufio.Reader, cfg *config.Config, projectID string, 
 	if err := p.AddCommand(updated); err != nil {
 		return err
 	}
+	fmt.Println(ui.Green(fmt.Sprintf("updated %q", alias)))
 	return config.Save(cfg)
+}
+
+func resolveProjectCommand(p *config.Project, name string) *config.Command {
+	if c := p.FindCommand(name); c != nil {
+		return c
+	}
+	if c := p.FindCommandByAbbrev(name); c != nil {
+		return c
+	}
+	for i := range p.Commands {
+		if strings.EqualFold(p.Commands[i].Alias, name) {
+			return &p.Commands[i]
+		}
+	}
+	return nil
 }

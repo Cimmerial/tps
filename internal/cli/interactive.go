@@ -6,16 +6,22 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Cimmerial/tps/internal/config"
 	gittool "github.com/Cimmerial/tps/internal/git"
 	"github.com/Cimmerial/tps/internal/project"
+	"github.com/Cimmerial/tps/internal/jobs"
 	"github.com/Cimmerial/tps/internal/runner"
 	"github.com/Cimmerial/tps/internal/ui"
 	"github.com/Cimmerial/tps/internal/update"
 )
 
 func runInteractive() error {
+	restartBanner := takeSessionRestartBanner()
+	if restartBanner != "" {
+		ui.ClearScreen()
+	}
 	ui.PrintLogo()
 
 	spin := ui.NewSpinner("loading")
@@ -45,18 +51,28 @@ func runInteractive() error {
 			fmt.Println("no projects linked. Run: tps project add")
 			return nil
 		}
-		fmt.Println("select a project:")
-		for i, p := range cfg.Projects {
-			fmt.Printf("  %d) %s  %s\n", i+1, p.Name, p.Path)
-		}
-		selected, err := pickProject(cfg)
-		if err != nil {
+		if linked, ok, err := tryAutoLinkFromCwd(cfg, cwd); err != nil {
 			return err
+		} else if ok {
+			if err := config.Save(cfg); err != nil {
+				return err
+			}
+			fmt.Println(ui.Green(fmt.Sprintf("linked %q at %s", linked.Name, linked.Path)))
+			projectID = linked.ID
+		} else {
+			fmt.Println("select a project:")
+			for i, p := range cfg.Projects {
+				fmt.Printf("  %d) %s  %s\n", i+1, p.Name, p.Path)
+			}
+			selected, err := pickProject(cfg)
+			if err != nil {
+				return err
+			}
+			if selected == nil {
+				return nil
+			}
+			projectID = selected.ID
 		}
-		if selected == nil {
-			return nil
-		}
-		projectID = selected.ID
 	}
 
 	reader := bufio.NewReader(os.Stdin)
@@ -65,14 +81,27 @@ func runInteractive() error {
 	if err != nil {
 		return err
 	}
-	if len(selected.Commands) == 0 {
-		fmt.Println("no commands for this project. Run: tps project cmd add <alias> <shell>")
-		return nil
+	if restartBanner == "" {
+		if root := devRepoRoot(cfg, selected); root != "" {
+			spin := ui.NewSpinner("checking for updates")
+			if err := update.MaybeAutoUpdate(root); err != nil {
+				spin.Stop()
+				fmt.Fprintf(os.Stderr, "%s\n", ui.Dim("auto-update: "+err.Error()))
+			} else {
+				spin.Stop()
+			}
+		}
 	}
-	printSessionHeader(selected)
+	if len(selected.Commands) == 0 {
+		fmt.Println(ui.Dim("no project commands — tps project cmd add <alias> <shell>"))
+	}
+	printSessionHeader(selected, restartBanner)
 
+	activityTick := 0
 	for {
-		fmt.Print("> ")
+		active, _ := jobs.Reap(projectID)
+		fmt.Print(ui.PromptBusy(len(active), activityTick))
+		activityTick++
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return err
@@ -93,26 +122,76 @@ func runInteractive() error {
 		case ActionNoop:
 			continue
 		case ActionQuit:
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
 			return nil
 		case ActionHelp:
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
 			printFullHelp(selected)
+		case ActionInstallHelp:
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
+			if input.InstallCopy {
+				if err := copyInstallCommands(cfg, selected); err != nil {
+					fmt.Fprintf(os.Stderr, "ih: %v\n", err)
+				}
+			} else {
+				printInstallHelp()
+			}
 		case ActionClear:
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
 			if err := refreshInteractiveSession(projectID); err != nil {
 				return err
 			}
 		case ActionConfig:
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
 			if err := config.OpenConfigInEditor(); err != nil {
 				fmt.Fprintf(os.Stderr, "config: %v\n", err)
+			} else {
+				fmt.Println(ui.Dim("opened config.yaml (tps stays open)"))
+			}
+		case ActionNewCommand:
+			recordMetaUse(cfg, selected, input.Action)
+			if err := addProjectCommand(cfg, projectID, input.NewCmd); err != nil {
+				fmt.Fprintf(os.Stderr, "nc: %v\n", err)
+				continue
+			}
+			cfg, selected, err = loadProject(projectID)
+			if err != nil {
+				return err
 			}
 		case ActionUpdate:
-			if err := update.InstallAndRestart(selected.Path); err != nil {
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
+			if err := update.InstallAndRestart(selected.Path, input.UpdateAll); err != nil {
 				fmt.Fprintf(os.Stderr, "update: %v\n", err)
 			}
 		case ActionEdit:
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
 			if err := runEditCommand(reader, cfg, projectID, input.Alias); err != nil {
 				fmt.Fprintf(os.Stderr, "edit: %v\n", err)
 			}
+		case ActionSwitchProject:
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
+			newID, err := switchProject(reader, cfg, projectID, input.Text)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "project: %v\n", err)
+				continue
+			}
+			if newID != "" && newID != projectID {
+				projectID = newID
+				if err := refreshInteractiveSession(projectID); err != nil {
+					return err
+				}
+			}
 		case ActionGitShip:
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
 			code, err := gittool.Ship(selected.Path, input.Text)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "git: %v\n", err)
@@ -122,6 +201,8 @@ func runInteractive() error {
 				fmt.Fprintf(os.Stderr, "git exited with code %d\n", code)
 			}
 		case ActionGit:
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
 			args := gittool.ParseArgsLine(input.Text)
 			code, err := gittool.Run(selected.Path, args)
 			if err != nil {
@@ -131,7 +212,37 @@ func runInteractive() error {
 			if code != 0 {
 				fmt.Fprintf(os.Stderr, "git exited with code %d\n", code)
 			}
+		case ActionTerminalCheck:
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
+			if err := runTerminalCheck(projectID, input); err != nil {
+				fmt.Fprintf(os.Stderr, "tc: %v\n", err)
+			}
 		case ActionRun:
+			cmd := selected.FindCommand(input.Alias)
+			if cmd != nil && runner.ShouldDetach(*cmd) {
+				job, err := jobs.Start(selected, input.Alias)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: %v\n", err)
+					continue
+				}
+				fmt.Println(ui.Green(fmt.Sprintf("started #%d in new terminal (%s)", job.ID, job.Alias)))
+				if cmd.Capture != "" {
+					logPath, err := jobs.LogFile(selected.ID, job.ID)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "%s\n", ui.Dim("capture: "+err.Error()))
+					} else {
+						pattern := config.ResolveCapturePattern(cmd.Capture)
+						fmt.Println(ui.Dim("watching output for link…"))
+						go jobs.WatchCapture(logPath, pattern, 90*time.Second)
+					}
+				}
+				selected.RecordCommandUse(input.Alias)
+				if err := config.Save(cfg); err != nil {
+					fmt.Fprintf(os.Stderr, "could not save usage: %v\n", err)
+				}
+				continue
+			}
 			code, err := runner.RunCommand(selected, input.Alias)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -146,7 +257,7 @@ func runInteractive() error {
 				fmt.Fprintf(os.Stderr, "could not save usage: %v\n", err)
 			}
 			if strings.EqualFold(input.Alias, "update") && canSelfUpdate(selected.Path) {
-				if err := update.RestartInteractive(); err != nil {
+				if err := update.RestartInteractive(true); err != nil {
 					fmt.Fprintf(os.Stderr, "restart: %v\n", err)
 				}
 			}
@@ -161,7 +272,7 @@ func refreshInteractiveSession(projectID string) error {
 	if err != nil {
 		return err
 	}
-	printSessionHeader(selected)
+	printSessionHeader(selected, "")
 	return nil
 }
 
@@ -177,9 +288,17 @@ func loadProject(projectID string) (*config.Config, *config.Project, error) {
 	return cfg, selected, nil
 }
 
+func recordMetaUse(cfg *config.Config, p *config.Project, action InputAction) {
+	key := metaKeyForAction(action)
+	if key == "" {
+		return
+	}
+	p.RecordMetaUse(key)
+}
+
 func pickProject(cfg *config.Config) (*config.Project, error) {
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("> ")
+	fmt.Print(ui.Prompt())
 	line, err := reader.ReadString('\n')
 	if err != nil {
 		return nil, err
