@@ -36,6 +36,7 @@ func printConfigExamples() {
         abbreviation: cf
         shell: cloudflared tunnel --url http://localhost:5173
         capture: trycloudflare
+        capture_actions: [print, clipboard, sms]
         detach: true`,
 		},
 		{

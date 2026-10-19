@@ -35,7 +35,7 @@ var runCmd = &cobra.Command{
 				return err
 			}
 		}
-		code, err := executeProjectCommand(res.Project, args[0], nil)
+		code, _, err := executeProjectCommand(res.Project, args[0], nil)
 		if err != nil {
 			return err
 		}

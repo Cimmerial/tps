@@ -21,7 +21,8 @@ type Command struct {
 	Description string `yaml:"description,omitempty"`
 	Detach          bool `yaml:"detach,omitempty"`
 	ForceForeground bool `yaml:"foreground,omitempty"` // skip auto-detach heuristics
-	Capture     string   `yaml:"capture,omitempty"` // regex or preset (trycloudflare) — detached + copy match
+	Capture        string   `yaml:"capture,omitempty"`         // regex or preset (url, trycloudflare, …)
+	CaptureActions []string `yaml:"capture_actions,omitempty"` // print, clipboard, sms
 	Tags        []string `yaml:"tags,omitempty"`    // first tag = menu folder (e.g. admin, git)
 	Precursor   string   `yaml:"precursor,omitempty"` // alias or abbrev of command to run first
 

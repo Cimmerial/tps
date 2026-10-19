@@ -21,6 +21,7 @@ func (c *Command) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	c.Detach = boolField(raw, "detach")
 	c.ForceForeground = boolField(raw, "foreground")
 	c.Capture = stringField(raw, "capture")
+	c.CaptureActions = ParseCaptureActions(raw["capture_actions"])
 	c.Tags = parseTagsField(raw["tags"])
 	c.Precursor = stringField(raw, "precursor")
 
@@ -56,6 +57,9 @@ func (c Command) MarshalYAML() (interface{}, error) {
 	}
 	if c.Capture != "" {
 		out["capture"] = c.Capture
+	}
+	if len(c.CaptureActions) > 0 {
+		out["capture_actions"] = c.CaptureActions
 	}
 	if len(c.Tags) > 0 {
 		out["tags"] = c.Tags

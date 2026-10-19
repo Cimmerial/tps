@@ -395,7 +395,7 @@ func editCommandSubmenu(reader *bufio.Reader, projectID, alias string) error {
 				return err
 			}
 		case 8:
-			if err := editPromptCapture(reader, projectID, alias, cmd); err != nil {
+			if err := editCaptureSubmenu(reader, projectID, alias); err != nil {
 				return err
 			}
 		case 9:
@@ -621,23 +621,6 @@ func editPromptPrecursor(reader *bufio.Reader, projectID, alias string, cmd *con
 	}
 	return editMutateCommand(projectID, alias, func(c *config.Command) {
 		c.Precursor = strings.TrimSpace(val)
-	})
-}
-
-func editPromptCapture(reader *bufio.Reader, projectID, alias string, cmd *config.Command) error {
-	val, ok, err := editPromptField(reader, "capture", cmd.Capture, true)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		fmt.Println(ui.Dim("unchanged"))
-		return nil
-	}
-	return editMutateCommand(projectID, alias, func(c *config.Command) {
-		c.Capture = strings.TrimSpace(val)
-		if c.Capture != "" {
-			c.Detach = true
-		}
 	})
 }
 

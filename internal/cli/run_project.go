@@ -12,17 +12,19 @@ import (
 
 // executeProjectCommand runs precursors (in order) then the requested alias.
 // Foreground steps share one shell so export/source in a precursor applies to later steps.
-func executeProjectCommand(p *config.Project, alias string, inputs []string) (int, error) {
+// compactNextPrompt is true when capture output was printed (no extra blank line before prompt).
+func executeProjectCommand(p *config.Project, alias string, inputs []string) (int, bool, error) {
 	chain, err := p.CommandRunChain(alias)
 	if err != nil {
-		return 1, err
+		return 1, false, err
 	}
+	compactNextPrompt := false
 	target := chain[len(chain)-1]
 	var fg []string
 	for i, a := range chain {
 		cmd := p.FindCommand(a)
 		if cmd == nil {
-			return 1, fmt.Errorf("unknown command %q", a)
+			return 1, false, fmt.Errorf("unknown command %q", a)
 		}
 		var shellInputs []string
 		if a == target {
@@ -30,7 +32,7 @@ func executeProjectCommand(p *config.Project, alias string, inputs []string) (in
 		}
 		shells, err := cmd.ShellsWithInputs(shellInputs)
 		if err != nil {
-			return 1, err
+			return 1, false, err
 		}
 		if i < len(chain)-1 {
 			fmt.Println(ui.Dim("precursor: " + a))
@@ -39,24 +41,27 @@ func executeProjectCommand(p *config.Project, alias string, inputs []string) (in
 			code, err := runForegroundChain(p, fg)
 			fg = nil
 			if err != nil {
-				return code, err
+				return code, compactNextPrompt, err
 			}
 			if code != 0 {
-				return code, nil
+				return code, compactNextPrompt, nil
 			}
 			started, err := jobs.StartAllWithShells(p, a, shells)
 			if err != nil {
-				return 1, err
+				return 1, compactNextPrompt, err
 			}
 			for _, job := range started {
 				fmt.Println(ui.Green(fmt.Sprintf("started #%d in new terminal (%s)", job.ID, job.Alias)))
-				watchCaptureIfNeeded(p, job)
+				if watchCaptureIfNeeded(p, job) {
+					compactNextPrompt = true
+				}
 			}
 			continue
 		}
 		fg = append(fg, shells...)
 	}
-	return runForegroundChain(p, fg)
+	code, err := runForegroundChain(p, fg)
+	return code, compactNextPrompt, err
 }
 
 func runForegroundChain(p *config.Project, parts []string) (int, error) {

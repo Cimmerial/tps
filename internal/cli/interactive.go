@@ -16,6 +16,7 @@ import (
 
 func runInteractive() error {
 	restartBanner := takeSessionRestartBanner()
+	restartProjectID := takeSessionRestartProjectID()
 
 	spin := ui.NewSpinner("loading")
 	if err := applyUIPreferences(); err != nil {
@@ -34,7 +35,7 @@ func runInteractive() error {
 	}
 
 	var projectID string
-	choice, err := resolveInteractiveProject(cfg, cwd)
+	choice, err := resolveInteractiveProject(cfg, cwd, restartProjectID)
 	spin.Stop()
 	if err != nil {
 		return err
@@ -63,6 +64,9 @@ func runInteractive() error {
 		}
 		projectID = selected.ID
 	}
+	if err := config.SaveSessionProjectID(projectID); err != nil {
+		return err
+	}
 
 	reader := bufio.NewReader(os.Stdin)
 
@@ -90,6 +94,7 @@ func runInteractive() error {
 	printSessionHeader(selected, projectID, restartBanner, "", statusTick)
 
 	gapBeforePrompt := false
+	displayPrevProject := ""
 	for {
 		active, _ := jobs.Reap(projectID)
 		line, err := readLine(reader, len(active), statusTick, gapBeforePrompt)
@@ -137,7 +142,7 @@ func runInteractive() error {
 		case ActionClear:
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
-			if err := refreshInteractiveSession(projectID, statusTick, ""); err != nil {
+			if err := refreshInteractiveSession(projectID, statusTick, displayPrevProject); err != nil {
 				return err
 			}
 		case ActionConfig:
@@ -184,9 +189,12 @@ func runInteractive() error {
 				continue
 			}
 			if newID != "" {
-				prevName := selected.Name
+				displayPrevProject = selected.Name
 				projectID = newID
-				if err := refreshInteractiveSession(projectID, statusTick, prevName); err != nil {
+				if err := config.SaveSessionProjectID(projectID); err != nil {
+					return err
+				}
+				if err := refreshInteractiveSession(projectID, statusTick, displayPrevProject); err != nil {
 					return err
 				}
 			}
@@ -250,7 +258,7 @@ func runInteractive() error {
 				fmt.Fprintf(os.Stderr, "options: %v\n", err)
 			}
 		case ActionRun:
-			code, err := executeProjectCommand(selected, input.Alias, input.ShellInputs)
+			code, compactPrompt, err := executeProjectCommand(selected, input.Alias, input.ShellInputs)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				continue
@@ -267,6 +275,10 @@ func runInteractive() error {
 				if err := update.RestartInteractive(true); err != nil {
 					fmt.Fprintf(os.Stderr, "restart: %v\n", err)
 				}
+			}
+			if compactPrompt {
+				gapBeforePrompt = false
+				continue
 			}
 		}
 		if needsGapBeforeNextPrompt(input.Action) {

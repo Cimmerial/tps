@@ -3,23 +3,34 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
 func TestPreferencesRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	var tpsDir string
+	if runtime.GOOS == "darwin" {
+		tpsDir = filepath.Join(dir, "Library", "Application Support", "tps")
+	} else {
+		tpsDir = filepath.Join(dir, ".config", "tps")
+	}
+	if err := os.MkdirAll(tpsDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
 
 	on := true
 	prefs := &Preferences{
 		Logo:         "block",
 		Accent:       "magenta",
 		ColorEnabled: &on,
+		SMSTo:        "+15551234567",
 	}
 	if err := SavePreferences(prefs); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(dir, "tps", "preferences.yaml")
+	path := filepath.Join(tpsDir, "preferences.yaml")
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("expected file: %v", err)
 	}
@@ -32,6 +43,9 @@ func TestPreferencesRoundTrip(t *testing.T) {
 	}
 	if loaded.ColorEnabled == nil || !*loaded.ColorEnabled {
 		t.Fatal("color_enabled not preserved")
+	}
+	if loaded.SMSTo != "+15551234567" {
+		t.Fatalf("sms_to = %q", loaded.SMSTo)
 	}
 }
 

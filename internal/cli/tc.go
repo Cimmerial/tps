@@ -128,17 +128,30 @@ func runTerminalCheck(p *config.Project, in MenuInput) error {
 	return printTerminalJobs(p.ID)
 }
 
-func watchCaptureIfNeeded(p *config.Project, job jobs.Job) {
+func watchCaptureIfNeeded(p *config.Project, job jobs.Job) bool {
 	cmd := p.FindCommand(job.Alias)
 	if cmd == nil || cmd.Capture == "" {
-		return
+		return false
 	}
 	logPath, err := jobs.LogFile(p.ID, job.ID)
 	if err != nil {
-		return
+		return false
 	}
-	pattern := config.ResolveCapturePattern(cmd.Capture)
-	jobs.WatchCapture(logPath, pattern, 90*time.Second)
+	prefs, _ := config.LoadPreferences()
+	smsTo, smsShortcut := "", ""
+	if prefs != nil {
+		smsTo = prefs.SMSTo
+		smsShortcut = prefs.SMSShortcut
+	}
+	jobs.WatchCapture(jobs.CaptureOptions{
+		LogPath:     logPath,
+		Pattern:     cmd.Capture,
+		Actions:     cmd.EffectiveCaptureActions(),
+		SMSTo:       smsTo,
+		SMSShortcut: smsShortcut,
+		Timeout:     90 * time.Second,
+	})
+	return true
 }
 
 func runWithBraille(label string, fn func() error) error {

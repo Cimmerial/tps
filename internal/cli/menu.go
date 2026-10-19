@@ -111,7 +111,7 @@ func printFullHelp(p *config.Project) {
 				cmdRow("clear", "tps", "reset screen and menu"),
 				cmdRow("quit", "q", "exit tps"),
 				cmdRow("project", "p", "switch linked project"),
-				cmdRow("options", "o", "title card logo/color, terminal colors"),
+				cmdRow("options", "o", "logo/color, terminal colors, capture sms"),
 			},
 		},
 		{

@@ -15,6 +15,8 @@ type prefSnapshot struct {
 	titleCardColor string
 	accent         string
 	colorLabel     string
+	smsTo          string
+	smsShortcut    string
 }
 
 func snapshotPreferences(p *config.Preferences) prefSnapshot {
@@ -23,6 +25,8 @@ func snapshotPreferences(p *config.Preferences) prefSnapshot {
 		titleCardColor: p.TitleCardColorMode(),
 		accent:         p.AccentMode(),
 		colorLabel:     colorPrefLabel(p.ColorEnabled),
+		smsTo:          strings.TrimSpace(p.SMSTo),
+		smsShortcut:    strings.TrimSpace(p.SMSShortcut),
 	}
 }
 
@@ -44,7 +48,20 @@ func optionsSessionChanges(before, after prefSnapshot) []string {
 	if before.colorLabel != after.colorLabel {
 		lines = append(lines, formatPrefChange("color", before.colorLabel, after.colorLabel))
 	}
+	if before.smsTo != after.smsTo {
+		lines = append(lines, formatPrefChange("sms_to", prefDisplay(before.smsTo), prefDisplay(after.smsTo)))
+	}
+	if before.smsShortcut != after.smsShortcut {
+		lines = append(lines, formatPrefChange("sms_shortcut", prefDisplay(before.smsShortcut), prefDisplay(after.smsShortcut)))
+	}
 	return lines
+}
+
+func prefDisplay(v string) string {
+	if v == "" {
+		return "(empty)"
+	}
+	return v
 }
 
 func finishOptionsSession(projectID string, statusTick int, start prefSnapshot) error {
@@ -89,6 +106,7 @@ func runOptionsMenu(projectID string, statusTick int) error {
 			{Num: "1", Desc: ui.Dim("title card logo")},
 			{Num: "2", Desc: ui.Dim("title card color")},
 			{Num: "3", Desc: ui.Dim("terminal colors")},
+			{Num: "4", Desc: optionsCaptureSMSRowDesc(prefs)},
 		})
 		fmt.Println()
 		printNumberedMenuRows([]numberedMenuRow{
@@ -121,6 +139,14 @@ func runOptionsMenu(projectID string, statusTick int) error {
 			}
 		case 3:
 			changed, err := optionsColorsMenu(prefs, projectID, statusTick)
+			if err != nil {
+				return err
+			}
+			if changed {
+				continue
+			}
+		case 4:
+			changed, err := optionsCaptureSMSMenu(prefs, projectID, statusTick)
 			if err != nil {
 				return err
 			}

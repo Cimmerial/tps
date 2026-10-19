@@ -9,19 +9,19 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Preferences are stored separately from project config (~/.config/tps/preferences.yaml).
+// Preferences are stored separately from project config (same tps dir as config.yaml; see PreferencesPath).
 type Preferences struct {
 	Logo           string `yaml:"logo,omitempty"`
 	TitleCard      string `yaml:"titlecard,omitempty"`
 	TitleCardColor string `yaml:"title_card_color,omitempty"` // see config.ColorPresets
 	Accent         string `yaml:"accent,omitempty"`             // see config.ColorPresets
 	ColorEnabled   *bool  `yaml:"color_enabled,omitempty"`
+	SMSTo              string `yaml:"sms_to,omitempty"`                // E.164 for capture SMS
+	SMSShortcut        string `yaml:"sms_shortcut,omitempty"`          // optional Shortcuts name (preferred over AppleScript)
+	SessionProjectID   string `yaml:"session_project_id,omitempty"`    // interactive session project (survives switch / restart)
 }
 
 func PreferencesPath() (string, error) {
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, "tps", "preferences.yaml"), nil
-	}
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
@@ -46,6 +46,20 @@ func LoadPreferences() (*Preferences, error) {
 		return nil, err
 	}
 	return &prefs, nil
+}
+
+// SaveSessionProjectID records the active interactive project (merges into existing preferences).
+func SaveSessionProjectID(projectID string) error {
+	projectID = strings.TrimSpace(projectID)
+	prefs, err := LoadPreferences()
+	if err != nil {
+		return err
+	}
+	if prefs.SessionProjectID == projectID {
+		return nil
+	}
+	prefs.SessionProjectID = projectID
+	return SavePreferences(prefs)
 }
 
 func SavePreferences(prefs *Preferences) error {
