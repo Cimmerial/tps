@@ -1,51 +1,92 @@
 package config
 
-// UnmarshalYAML accepts abbreviation (preferred) and abbrev (legacy).
+import (
+	"fmt"
+	"runtime"
+	"strings"
+)
+
+// UnmarshalYAML accepts abbreviation (preferred) and abbrev (legacy), plus shell1 / linux_shell / …
 func (c *Command) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	type raw struct {
-		Alias        string `yaml:"alias"`
-		Shell        string `yaml:"shell"`
-		Description  string `yaml:"description,omitempty"`
-		Abbreviation string `yaml:"abbreviation,omitempty"`
-		Abbrev       string `yaml:"abbrev,omitempty"`
-		Detach       bool   `yaml:"detach,omitempty"`
-		Capture      string `yaml:"capture,omitempty"`
-	}
-	var r raw
-	if err := unmarshal(&r); err != nil {
+	var raw map[string]interface{}
+	if err := unmarshal(&raw); err != nil {
 		return err
 	}
-	c.Alias = r.Alias
-	c.Shell = r.Shell
-	c.Description = r.Description
-	c.Abbrev = r.Abbreviation
+	c.Alias = stringField(raw, "alias")
+	c.Description = stringField(raw, "description")
+	c.Abbrev = stringField(raw, "abbreviation")
 	if c.Abbrev == "" {
-		c.Abbrev = r.Abbrev
+		c.Abbrev = stringField(raw, "abbrev")
 	}
-	c.Detach = r.Detach
-	c.Capture = r.Capture
+	c.Detach = boolField(raw, "detach")
+	c.Capture = stringField(raw, "capture")
+	c.Tags = parseTagsField(raw["tags"])
+	c.Precursor = stringField(raw, "precursor")
+
+	st := parseShellStore(raw)
+	if len(st.generic) > 0 || len(st.windows) > 0 || len(st.linux) > 0 || len(st.darwin) > 0 {
+		c.shells = &st
+	}
+	resolved := st.resolved(runtime.GOOS)
+	if len(resolved) == 0 {
+		c.Shell = stringField(raw, "shell")
+	} else {
+		c.Shell = resolved[0]
+	}
 	return nil
 }
 
-// MarshalYAML writes abbreviation when abbrev is set.
+// MarshalYAML writes abbreviation when abbrev is set and preserves multi-shell keys.
 func (c Command) MarshalYAML() (interface{}, error) {
-	type out struct {
-		Alias        string `yaml:"alias"`
-		Shell        string `yaml:"shell"`
-		Description  string `yaml:"description,omitempty"`
-		Abbreviation string `yaml:"abbreviation,omitempty"`
-		Detach       bool   `yaml:"detach,omitempty"`
-		Capture      string `yaml:"capture,omitempty"`
+	out := map[string]interface{}{
+		"alias": c.Alias,
 	}
-	row := out{
-		Alias:       c.Alias,
-		Shell:       c.Shell,
-		Description: c.Description,
-		Detach:      c.Detach,
-		Capture:     c.Capture,
+	if c.Description != "" {
+		out["description"] = c.Description
 	}
 	if c.Abbrev != "" {
-		row.Abbreviation = c.Abbrev
+		out["abbreviation"] = c.Abbrev
 	}
-	return row, nil
+	if c.Detach {
+		out["detach"] = true
+	}
+	if c.Capture != "" {
+		out["capture"] = c.Capture
+	}
+	if len(c.Tags) > 0 {
+		out["tags"] = c.Tags
+	}
+	if strings.TrimSpace(c.Precursor) != "" {
+		out["precursor"] = strings.TrimSpace(c.Precursor)
+	}
+	if c.shells != nil {
+		for k, v := range c.shells.marshalFields() {
+			out[k] = v
+		}
+	} else if strings.TrimSpace(c.Shell) != "" {
+		out["shell"] = c.Shell
+	}
+	return out, nil
+}
+
+func stringField(m map[string]interface{}, key string) string {
+	v, ok := m[key]
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(v))
+}
+
+func boolField(m map[string]interface{}, key string) bool {
+	v, ok := m[key]
+	if !ok {
+		return false
+	}
+	switch x := v.(type) {
+	case bool:
+		return x
+	default:
+		s := strings.ToLower(strings.TrimSpace(fmt.Sprint(x)))
+		return s == "true" || s == "yes" || s == "1"
+	}
 }

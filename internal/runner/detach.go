@@ -7,10 +7,16 @@ import (
 )
 
 func ShouldDetach(c config.Command) bool {
+	if len(c.ResolvedShells()) > 1 {
+		return true
+	}
 	if c.Detach || c.Capture != "" {
 		return true
 	}
 	s := strings.ToLower(c.Shell)
+	if s == "" && len(c.ResolvedShells()) > 0 {
+		s = strings.ToLower(c.ResolvedShells()[0])
+	}
 	switch {
 	case strings.Contains(s, "vite"),
 		strings.Contains(s, "npm run dev"),

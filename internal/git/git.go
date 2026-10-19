@@ -33,7 +33,7 @@ func Run(dir string, args []string) (int, error) {
 func Ship(dir, message string) (int, error) {
 	message = strings.TrimSpace(message)
 	if message == "" {
-		return 1, fmt.Errorf("commit message required (example: gs fix the menu)")
+		return 1, fmt.Errorf("commit message required (example: g ship fix the menu)")
 	}
 	code, err := Run(dir, []string{"add", "-A"})
 	if err != nil {

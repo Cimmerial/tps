@@ -5,7 +5,6 @@ import (
 
 	"github.com/Cimmerial/tps/internal/config"
 	"github.com/Cimmerial/tps/internal/project"
-	"github.com/Cimmerial/tps/internal/runner"
 	"github.com/Cimmerial/tps/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -36,7 +35,7 @@ var runCmd = &cobra.Command{
 				return err
 			}
 		}
-		code, err := runner.RunCommand(res.Project, args[0])
+		code, err := executeProjectCommand(res.Project, args[0], nil)
 		if err != nil {
 			return err
 		}

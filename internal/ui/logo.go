@@ -15,5 +15,6 @@ const SmallLogo = `      ___           ___           ___
                                  \/__/    `
 
 func PrintLogo() {
+	fmt.Println()
 	fmt.Println(ColorizeLines(SmallLogo, cyan))
 }

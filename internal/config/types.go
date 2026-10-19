@@ -17,8 +17,12 @@ type Project struct {
 type Command struct {
 	Alias       string `yaml:"alias"`
 	Abbrev      string `yaml:"-"`
-	Shell       string `yaml:"shell"`
+	Shell       string `yaml:"shell,omitempty"`
 	Description string `yaml:"description,omitempty"`
 	Detach      bool   `yaml:"detach,omitempty"`
-	Capture     string `yaml:"capture,omitempty"` // regex or preset (trycloudflare) — detached + copy match
+	Capture     string   `yaml:"capture,omitempty"` // regex or preset (trycloudflare) — detached + copy match
+	Tags        []string `yaml:"tags,omitempty"`    // first tag = menu folder (e.g. admin, git)
+	Precursor   string   `yaml:"precursor,omitempty"` // alias or abbrev of command to run first
+
+	shells *shellStore `yaml:"-"`
 }

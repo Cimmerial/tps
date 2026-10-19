@@ -29,8 +29,7 @@ func switchProject(reader *bufio.Reader, cfg *config.Config, currentID string, n
 		}
 		fmt.Printf("  %s%d) %s  %s\n", marker, i+1, p.Name, p.Path)
 	}
-	fmt.Print(ui.Prompt())
-	line, err := reader.ReadString('\n')
+	line, err := ui.ReadEditedLine(ui.Prompt())
 	if err != nil {
 		return "", err
 	}

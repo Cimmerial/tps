@@ -27,8 +27,7 @@ func runEditCommand(reader *bufio.Reader, cfg *config.Config, projectID string, 
 			}
 			fmt.Printf("  %s\n", line)
 		}
-		fmt.Print(ui.Prompt())
-		line, err := reader.ReadString('\n')
+		line, err := ui.ReadEditedLine(ui.Prompt())
 		if err != nil {
 			return err
 		}
@@ -44,8 +43,7 @@ func runEditCommand(reader *bufio.Reader, cfg *config.Config, projectID string, 
 	}
 	alias = cmd.Alias
 
-	fmt.Printf("shell [%s]: ", cmd.Shell)
-	line, err := reader.ReadString('\n')
+	line, err := ui.ReadEditedLine(fmt.Sprintf("shell [%s]: ", cmd.Shell))
 	if err != nil {
 		return err
 	}

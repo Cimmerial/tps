@@ -11,10 +11,58 @@ import (
 )
 
 func Start(p *config.Project, alias string) (Job, error) {
-	return launch(p, alias, true)
+	jobs, err := StartAll(p, alias)
+	if err != nil {
+		return Job{}, err
+	}
+	if len(jobs) == 0 {
+		return Job{}, fmt.Errorf("no shell lines for %q", alias)
+	}
+	return jobs[0], nil
+}
+
+// StartAll launches each resolved shell line in its own terminal (one history entry per alias).
+func StartAll(p *config.Project, alias string) ([]Job, error) {
+	cmd := p.FindCommand(alias)
+	if cmd == nil {
+		return nil, fmt.Errorf("unknown command %q", alias)
+	}
+	shells, err := cmd.ShellsWithInputs(nil)
+	if err != nil {
+		return nil, err
+	}
+	return StartAllWithShells(p, alias, shells)
+}
+
+// StartAllWithShells launches pre-resolved shell lines (e.g. after [INPUTn] substitution).
+func StartAllWithShells(p *config.Project, alias string, shells []string) ([]Job, error) {
+	if len(shells) == 0 {
+		return nil, fmt.Errorf("command %q has no shell", alias)
+	}
+	out := make([]Job, 0, len(shells))
+	for i, shell := range shells {
+		job, err := launchShell(p, alias, shell, i == 0)
+		if err != nil {
+			return out, err
+		}
+		out = append(out, job)
+	}
+	return out, nil
 }
 
 func launch(p *config.Project, alias string, recordHistory bool) (Job, error) {
+	cmd := p.FindCommand(alias)
+	if cmd == nil {
+		return Job{}, fmt.Errorf("unknown command %q", alias)
+	}
+	shells := cmd.ResolvedShells()
+	if len(shells) == 0 {
+		return Job{}, fmt.Errorf("command %q has no shell", alias)
+	}
+	return launchShell(p, alias, shells[0], recordHistory)
+}
+
+func launchShell(p *config.Project, alias, shell string, recordHistory bool) (Job, error) {
 	cmd := p.FindCommand(alias)
 	if cmd == nil {
 		return Job{}, fmt.Errorf("unknown command %q", alias)
@@ -49,7 +97,7 @@ func launch(p *config.Project, alias string, recordHistory bool) (Job, error) {
 		_ = os.Remove(logPath)
 	}
 
-	if err := spawnInTerminal(p.Path, cmd.Shell, pidPath, logPath, ttyPath); err != nil {
+	if err := spawnInTerminal(p.Path, shell, pidPath, logPath, ttyPath); err != nil {
 		return Job{}, err
 	}
 
@@ -78,7 +126,7 @@ func launch(p *config.Project, alias string, recordHistory bool) (Job, error) {
 	job := Job{
 		ID:      id,
 		Alias:   alias,
-		Shell:   cmd.Shell,
+		Shell:   shell,
 		PID:     pid,
 		TTY:     tty,
 		Started: time.Now(),

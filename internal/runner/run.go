@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/Cimmerial/tps/internal/config"
 )
@@ -14,7 +15,20 @@ func RunCommand(p *config.Project, alias string) (int, error) {
 	if cmd == nil {
 		return 1, fmt.Errorf("unknown command %q for project %q", alias, p.Name)
 	}
-	c := exec.Command("sh", "-c", cmd.Shell)
+	shells := cmd.ResolvedShells()
+	if len(shells) == 0 {
+		return 1, fmt.Errorf("command %q has no shell", alias)
+	}
+	return RunScript(p, strings.Join(shells, " && "))
+}
+
+// RunScript runs shell in the project directory (stdin/stdout/stderr attached).
+func RunScript(p *config.Project, script string) (int, error) {
+	script = strings.TrimSpace(script)
+	if script == "" {
+		return 0, nil
+	}
+	c := exec.Command("sh", "-c", script)
 	c.Dir = p.Path
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout

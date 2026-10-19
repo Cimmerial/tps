@@ -46,6 +46,16 @@ func runSetup(nameOverride, pathOverride string) error {
 		linkDir = pathOverride
 	}
 
+	root, err := project.ProjectRootFromCwd(linkDir)
+	if err != nil {
+		return err
+	}
+	if existing := cfg.FindByPath(root); existing != nil && nameOverride == "" && pathOverride == "" {
+		fmt.Println(ui.Yellow(fmt.Sprintf("%q is already set up at %s", existing.Name, existing.Path)))
+		fmt.Println(ui.Dim("add commands in config.yaml, nc, or export/import · run ih for install help"))
+		return nil
+	}
+
 	tpsRepo, _ := installCopyRoots(cfg, nil, cwd)
 	if tpsRepo != "" {
 		spin := ui.NewSpinner("installing tps")

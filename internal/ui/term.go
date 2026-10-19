@@ -17,3 +17,7 @@ func ClearScreen() {
 func stdoutIsTTY() bool {
 	return term.IsTerminal(int(os.Stdout.Fd()))
 }
+
+func stdinIsTTY() bool {
+	return term.IsTerminal(int(os.Stdin.Fd()))
+}

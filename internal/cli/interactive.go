@@ -11,17 +11,12 @@ import (
 	gittool "github.com/Cimmerial/tps/internal/git"
 	"github.com/Cimmerial/tps/internal/project"
 	"github.com/Cimmerial/tps/internal/jobs"
-	"github.com/Cimmerial/tps/internal/runner"
 	"github.com/Cimmerial/tps/internal/ui"
 	"github.com/Cimmerial/tps/internal/update"
 )
 
 func runInteractive() error {
 	restartBanner := takeSessionRestartBanner()
-	if restartBanner != "" {
-		ui.ClearScreen()
-	}
-	ui.PrintLogo()
 
 	spin := ui.NewSpinner("loading")
 	cfg, err := config.Load()
@@ -95,11 +90,15 @@ func runInteractive() error {
 		fmt.Println(ui.Dim("no project commands — tps project cmd add <alias> <shell>"))
 	}
 	statusTick := 0
+	ui.ClearScreen()
+	ui.PrintLogo()
 	printSessionHeader(selected, projectID, restartBanner, statusTick)
 
+	gapBeforePrompt := false
 	for {
 		active, _ := jobs.Reap(projectID)
-		line, err := readLine(reader, len(active), statusTick)
+		line, err := readLine(reader, len(active), statusTick, gapBeforePrompt)
+		gapBeforePrompt = false
 		if len(active) > 0 {
 			statusTick++
 		}
@@ -115,6 +114,7 @@ func runInteractive() error {
 		input, err := resolveMenuInput(cfg, selected, line)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
+			gapBeforePrompt = true
 			continue
 		}
 
@@ -223,23 +223,32 @@ func runInteractive() error {
 			if err := runTerminalCheck(selected, input); err != nil {
 				fmt.Fprintf(os.Stderr, "t: %v\n", err)
 			}
-		case ActionRun:
-			cmd := selected.FindCommand(input.Alias)
-			if cmd != nil && runner.ShouldDetach(*cmd) {
-				job, err := jobs.Start(selected, input.Alias)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "error: %v\n", err)
-					continue
-				}
-				fmt.Println(ui.Green(fmt.Sprintf("started #%d in new terminal (%s)", job.ID, job.Alias)))
-				watchCaptureIfNeeded(selected, job)
-				selected.RecordCommandUse(input.Alias)
-				if err := config.Save(cfg); err != nil {
-					fmt.Fprintf(os.Stderr, "could not save usage: %v\n", err)
-				}
-				continue
+		case ActionExport:
+			recordMetaUse(cfg, selected, input.Action)
+			if err := runExport(cfg, selected, input); err != nil {
+				fmt.Fprintf(os.Stderr, "export: %v\n", err)
 			}
-			code, err := runner.RunCommand(selected, input.Alias)
+		case ActionImport:
+			recordMetaUse(cfg, selected, input.Action)
+			if err := runImport(cfg, input.Text); err != nil {
+				fmt.Fprintf(os.Stderr, "import: %v\n", err)
+			}
+			cfg, selected, err = loadProject(projectID)
+			if err != nil {
+				return err
+			}
+		case ActionSetup:
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
+			if err := runSetup(input.SetupName, input.SetupPath); err != nil {
+				fmt.Fprintf(os.Stderr, "setup: %v\n", err)
+			}
+		case ActionConfigExamples:
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
+			printConfigExamples()
+		case ActionRun:
+			code, err := executeProjectCommand(selected, input.Alias, input.ShellInputs)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				continue
@@ -257,6 +266,9 @@ func runInteractive() error {
 					fmt.Fprintf(os.Stderr, "restart: %v\n", err)
 				}
 			}
+		}
+		if needsGapBeforeNextPrompt(input.Action) {
+			gapBeforePrompt = true
 		}
 	}
 }
@@ -293,9 +305,7 @@ func recordMetaUse(cfg *config.Config, p *config.Project, action InputAction) {
 }
 
 func pickProject(cfg *config.Config) (*config.Project, error) {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print(ui.Prompt())
-	line, err := reader.ReadString('\n')
+	line, err := ui.ReadEditedLine(ui.Prompt())
 	if err != nil {
 		return nil, err
 	}

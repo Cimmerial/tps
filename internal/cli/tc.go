@@ -70,7 +70,7 @@ func printTerminalJobs(projectID string) error {
 		fmt.Println(ui.Dim("no terminals running (tk · t -k 1)"))
 		return nil
 	}
-	fmt.Println(ui.Bold("TERMINALS:"))
+	fmt.Println(ui.Header("TERMINALS:"))
 	for _, j := range list {
 		age := time.Since(j.Started).Round(time.Second)
 		fmt.Printf("  %d) %s  pid %d  %s  %s\n",

@@ -19,11 +19,11 @@ func RestartAll(p *config.Project) ([]Job, error) {
 	time.Sleep(200 * time.Millisecond)
 	out := make([]Job, 0, len(hist))
 	for _, alias := range hist {
-		job, err := launch(p, alias, false)
+		jobs, err := StartAll(p, alias)
 		if err != nil {
 			return out, fmt.Errorf("restart %q: %w", alias, err)
 		}
-		out = append(out, job)
+		out = append(out, jobs...)
 		time.Sleep(150 * time.Millisecond)
 	}
 	return out, nil

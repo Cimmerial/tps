@@ -17,10 +17,22 @@ func isNewCommandPhrase(a, b string) bool {
 }
 
 func parseNewCommandFlags(fields []string) (config.Command, error) {
-	var name, abbrev, shell, capture string
+	var name, abbrev, shell, capture, tagsRaw, precursor string
 	detach := false
 	for i := 0; i < len(fields); i++ {
 		switch fields[i] {
+		case "-precursor", "--precursor":
+			i++
+			if i >= len(fields) {
+				return config.Command{}, fmt.Errorf("nc: -precursor requires a command alias or abbrev")
+			}
+			precursor = fields[i]
+		case "-tags", "--tags":
+			i++
+			if i >= len(fields) {
+				return config.Command{}, fmt.Errorf("nc: -tags requires a comma-separated list")
+			}
+			tagsRaw = fields[i]
 		case "-t", "--terminal":
 			detach = true
 		case "-capture", "-m":
@@ -60,14 +72,19 @@ func parseNewCommandFlags(fields []string) (config.Command, error) {
 	if capture != "" {
 		detach = true
 	}
-	return config.Command{
+	cmd := config.Command{
 		Alias:       name,
 		Abbrev:      abbrev,
 		Shell:       shell,
 		Description: name,
 		Detach:      detach,
 		Capture:     capture,
-	}, nil
+	}
+	if tagsRaw != "" {
+		cmd.Tags = config.ParseTagList(tagsRaw)
+	}
+	cmd.Precursor = precursor
+	return cmd, nil
 }
 
 func addProjectCommand(cfg *config.Config, projectID string, cmd config.Command) error {

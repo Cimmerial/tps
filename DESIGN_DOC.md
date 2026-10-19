@@ -57,8 +57,10 @@ Defined in config per project: `alias`, `shell`, `abbreviation`, optional `descr
 | `c` | Open config in Cursor/VS Code/`$EDITOR` (GUI editors non-blocking) |
 | `p` | Switch project |
 | `u` / `u -a` | `go install` from **linked tps dev repo** (works from any project), restart; `-a` sync all `tps` on PATH |
-| `gs` | git add/commit/push |
-| `git …` | Passthrough |
+| `g ship` / `git ship` | git add/commit/push (`gs` legacy) |
+| `g …` / `git …` | Git passthrough |
+| `export` / `export -a` | Export current project or all to YAML |
+| `import <file>` | Merge project(s) from export file |
 | `ih` / `ih -copy` | Install docs / clipboard script |
 | `tps` / `clear` | Refresh screen + menu |
 | `q` | Quit |
@@ -67,7 +69,7 @@ Startup **auto-update** (quiet `go install`) when a tps dev repo is in config, u
 
 ### Config & persistence
 
-- **Projects:** commands, `command_usage`, `meta_usage`.
+- **Projects:** commands (`shell`, `shell1`…, `tags` for menu folders, OS-specific shells), `command_usage`, `meta_usage`.
 - **Jobs:** per-project YAML under `…/tps/jobs/` (active PIDs, **launch history** for `tr`).
 - **PIDs/logs:** `…/tps/jobs/pids/`, `…/logs/` for capture.
 
