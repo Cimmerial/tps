@@ -32,7 +32,7 @@ var gitShipCmd = &cobra.Command{
 			return err
 		}
 		msg := strings.Join(args, " ")
-		code, err := gittool.Ship(root, msg)
+		code, err := runGitShip(root, msg)
 		if err != nil {
 			return err
 		}

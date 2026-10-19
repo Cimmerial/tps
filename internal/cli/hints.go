@@ -21,16 +21,17 @@ type hintEntry struct {
 func allBuiltInHints(p *config.Project) []hintEntry {
 	return []hintEntry{
 		{key: "help", abbr: "h", label: "help", order: 0, show: func(*config.Project) bool { return true }},
-		{key: "install_help", abbr: "ih", label: "install", order: 1, show: func(*config.Project) bool {
+		{key: "edit", abbr: "e", label: "edit", order: 1, show: func(*config.Project) bool { return true }},
+		{key: "install_help", abbr: "ih", label: "install", order: 2, show: func(*config.Project) bool {
 			_, err := exec.LookPath("tps")
 			return err != nil
 		}},
-		{key: "quit", abbr: "q", label: "quit", order: 2, show: func(*config.Project) bool { return true }},
-		{key: "switch", abbr: "p", label: "project", order: 3, show: func(*config.Project) bool { return true }},
-		{key: "clear", abbr: "tps", label: "clear", order: 4, show: func(*config.Project) bool { return true }},
-		{key: "new_command", abbr: "nc", label: "new cmd", order: 5, show: func(*config.Project) bool { return true }},
-		{key: "config", abbr: "c", label: "config", order: 6, show: func(*config.Project) bool { return true }},
-		{key: "options", abbr: "o", label: "options", order: 6, show: func(*config.Project) bool { return true }},
+		{key: "quit", abbr: "q", label: "quit", order: 3, show: func(*config.Project) bool { return true }},
+		{key: "switch", abbr: "p", label: "project", order: 4, show: func(*config.Project) bool { return true }},
+		{key: "clear", abbr: "tps", label: "clear", order: 5, show: func(*config.Project) bool { return true }},
+		{key: "new_command", abbr: "nc", label: "new cmd", order: 6, show: func(*config.Project) bool { return true }},
+		{key: "config", abbr: "c", label: "config", order: 7, show: func(*config.Project) bool { return true }},
+		{key: "options", abbr: "o", label: "options", order: 7, show: func(*config.Project) bool { return true }},
 		{key: "update", abbr: "u", label: "update", order: 7, show: func(p *config.Project) bool {
 			cfg, err := config.Load()
 			if err != nil {
@@ -45,7 +46,12 @@ func allBuiltInHints(p *config.Project) []hintEntry {
 }
 
 func isPinnedHintKey(key string) bool {
-	return key == "help" || key == "clear"
+	switch key {
+	case "help", "edit", "config", "clear":
+		return true
+	default:
+		return false
+	}
 }
 
 func builtInMainHints(p *config.Project) []hintEntry {
@@ -69,7 +75,7 @@ func builtInMainHints(p *config.Project) []hintEntry {
 
 func builtInPinnedHints(p *config.Project) []hintEntry {
 	var out []hintEntry
-	for _, key := range []string{"help", "clear"} {
+	for _, key := range []string{"help", "edit", "config", "clear"} {
 		for _, h := range allBuiltInHints(p) {
 			if h.key == key && h.show(p) {
 				out = append(out, h)
@@ -98,7 +104,7 @@ func printMenuHints(p *config.Project) {
 	for _, h := range builtInMainHints(p) {
 		mainParts = append(mainParts, hintPart(h.abbr, h.label))
 	}
-	pinnedParts := make([]string, 0, 2)
+	pinnedParts := make([]string, 0, 4)
 	for _, h := range builtInPinnedHints(p) {
 		pinnedParts = append(pinnedParts, hintPart(h.abbr, h.label))
 	}

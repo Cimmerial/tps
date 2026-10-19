@@ -134,41 +134,76 @@ func runOptionsMenu(projectID string, statusTick int) error {
 }
 
 func optionsLogoMenu(prefs *config.Preferences, projectID string, statusTick int) (bool, error) {
+	list := logos.Presets()
+	for {
+		ui.ClearScreen()
+		current := prefs.LogoID()
+		fmt.Println()
+		fmt.Printf("%s\n", ui.Header("options"))
+		fmt.Println()
+		fmt.Printf("%s\n", ui.SubHeader("title card logo"))
+		fmt.Printf("    %s %s\n", ui.Dim("current:"), ui.Bold(current)+" "+ui.Dim("("+logos.Label(current)+")"))
+		fmt.Println()
+		fmt.Printf("    %s\n", ui.Dim("pick a logo to preview — 0 or q = back"))
+		fmt.Println()
+		rows := make([]numberedMenuRow, len(list))
+		for i, p := range list {
+			desc := p.Label
+			if p.ID == current {
+				desc = optionsRowDescCurrent(p.Label)
+			} else {
+				desc = ui.Dim(p.Label)
+			}
+			rows[i] = numberedMenuRow{
+				Num:  fmt.Sprintf("%d", i+1),
+				Desc: desc,
+			}
+		}
+		printNumberedMenuRows(rows)
+		fmt.Println()
+		printNumberedMenuRows([]numberedMenuRow{
+			{Num: "0", Abbrev: "q", Desc: ui.Dim("back")},
+		})
+		fmt.Println()
+
+		choice, back, err := readOptionsMenuChoice()
+		if err != nil || back {
+			return false, err
+		}
+		if choice < 1 || choice > len(list) {
+			fmt.Println(ui.Dim("invalid choice"))
+			continue
+		}
+		id := list[choice-1].ID
+		applied, err := optionsLogoPreviewApply(prefs, projectID, statusTick, id, current)
+		if err != nil {
+			return applied, err
+		}
+		if applied {
+			return true, nil
+		}
+	}
+}
+
+func optionsLogoPreviewApply(prefs *config.Preferences, projectID string, statusTick int, id, current string) (bool, error) {
 	ui.ClearScreen()
-	current := prefs.LogoID()
 	fmt.Println()
 	fmt.Printf("%s\n", ui.Header("options"))
 	fmt.Println()
 	fmt.Printf("%s\n", ui.SubHeader("title card logo"))
-	fmt.Printf("    %s %s\n", ui.Dim("current:"), ui.Bold(current)+" "+ui.Dim("("+logos.Label(current)+")"))
+	fmt.Printf("    %s %s\n", ui.Dim("preview:"), ui.Bold(logos.Label(id)))
 	fmt.Println()
-	list := logos.Presets()
-	rows := make([]numberedMenuRow, len(list))
-	for i, p := range list {
-		desc := p.ID
-		if p.ID == current {
-			desc = optionsRowDescCurrent(p.ID)
-		}
-		rows[i] = numberedMenuRow{
-			Num:  fmt.Sprintf("%d", i+1),
-			Desc: desc + " " + ui.Dim("— "+p.Label),
-		}
-	}
-	printNumberedMenuRows(rows)
+	ui.PrintLogoPreview(id)
 	fmt.Println()
 	printNumberedMenuRows([]numberedMenuRow{
-		{Num: "0", Abbrev: "q", Desc: ui.Dim("no change / back")},
+		{Num: "1", Desc: ui.Dim("use this logo")},
+		{Num: "0", Abbrev: "q", Desc: ui.Dim("back")},
 	})
 	fmt.Println()
 	choice, back, err := readOptionsMenuChoice()
-	if err != nil || back {
+	if err != nil || back || choice != 1 {
 		return false, err
 	}
-	if choice < 1 || choice > len(list) {
-		fmt.Println(ui.Dim("invalid choice"))
-		return false, nil
-	}
-	id := list[choice-1].ID
 	if id == current {
 		fmt.Println(ui.Dim("already set"))
 		return false, nil

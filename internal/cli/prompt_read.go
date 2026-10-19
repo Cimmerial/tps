@@ -9,7 +9,7 @@ import (
 
 func readLine(_ *bufio.Reader, running int, tick int, padBefore bool) (string, error) {
 	if padBefore {
-		fmt.Println()
+		fmt.Print("\r\033[K\n")
 	}
 	line, err := ui.ReadEditedLine(ui.PromptBusy(running, tick))
 	if err != nil {

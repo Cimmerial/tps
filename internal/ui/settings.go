@@ -56,5 +56,8 @@ func PaintColorID(id, s string) string {
 }
 
 func logoArt() string {
+	if config.NormalizeLogoID(current.LogoID) == "random" {
+		return logos.Art(logos.PickRandom())
+	}
 	return logos.Art(current.LogoID)
 }

@@ -172,7 +172,7 @@ func runInteractive() error {
 		case ActionEdit:
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
-			if err := runEditCommand(reader, cfg, projectID, input.Alias); err != nil {
+			if err := runEditCommand(reader, cfg, projectID, statusTick, input.Alias); err != nil {
 				fmt.Fprintf(os.Stderr, "edit: %v\n", err)
 			}
 		case ActionSwitchProject:
@@ -193,7 +193,7 @@ func runInteractive() error {
 		case ActionGitShip:
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
-			code, err := gittool.Ship(selected.Path, input.Text)
+			code, err := runGitShip(selected.Path, input.Text)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "git: %v\n", err)
 				continue

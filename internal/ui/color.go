@@ -33,6 +33,11 @@ func paint(code, s string) string {
 
 func Bold(s string) string    { return paint(bold, s) }
 func Dim(s string) string     { return paint(dim, s) }
+
+// Faint styles menu previews of current values (lighter than body text, still readable).
+func Faint(s string) string {
+	return paint("\033[37m", s)
+}
 func Cyan(s string) string    { return paint(cyan, s) }
 func Green(s string) string   { return paint(green, s) }
 func Yellow(s string) string  { return paint(yellow, s) }

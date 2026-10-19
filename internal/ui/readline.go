@@ -23,7 +23,7 @@ func ReadEditedLine(prompt string) (string, error) {
 	}
 	defer term.Restore(fd, old)
 
-	fmt.Print(prompt)
+	fmt.Print("\r\033[K" + prompt)
 	buf := []rune{}
 	pos := 0
 	in := bufio.NewReader(os.Stdin)
@@ -48,14 +48,14 @@ func ReadEditedLine(prompt string) (string, error) {
 
 		switch b {
 		case '\r', '\n':
-			fmt.Println()
+			fmt.Print("\r\033[K\n")
 			return string(buf), nil
 		case 3: // Ctrl+C
-			fmt.Println()
+			fmt.Print("\r\033[K\n")
 			return "", fmt.Errorf("interrupted")
 		case 4: // Ctrl+D
 			if len(buf) == 0 {
-				fmt.Println()
+				fmt.Print("\r\033[K\n")
 				return "", io.EOF
 			}
 		case 127, 8: // backspace / DEL

@@ -118,7 +118,7 @@ func printFullHelp(p *config.Project) {
 			title: "config",
 			rows: []helpRow{
 				cmdRow("config", "c", "open config.yaml in Cursor/VS Code or $EDITOR"),
-				cmdRow("edit", "e", "change a command shell (e hello)"),
+				cmdRow("edit", "e", "edit commands, tags, shells (e hello)"),
 				cmdRow("new command", "nc", "nc -n name -a abbrev -c shell (-tags admin,git -t terminal, -m capture); run: ic -user"),
 				cmdRow("terminals", "t", "t · tk · t -k 1 · tr"),
 				cmdRow("export", "export", "export project YAML (export -a for all)"),
@@ -262,6 +262,7 @@ func isInstallHelpToken(tok string) bool {
 type numberedMenuRow struct {
 	Num      string
 	Abbrev   string
+	Status   string
 	Desc     string
 	HelpLine string
 }
@@ -275,29 +276,59 @@ func numberedMenuRowsHaveAbbrev(rows []numberedMenuRow) bool {
 	return false
 }
 
+func numberedMenuRowsHaveStatus(rows []numberedMenuRow) bool {
+	for _, r := range rows {
+		if strings.TrimSpace(r.Status) != "" {
+			return true
+		}
+	}
+	return false
+}
+
 func printNumberedMenuRows(rows []numberedMenuRow) {
-	hasAbbrev := numberedMenuRowsHaveAbbrev(rows)
-	maxAbbrev := 0
-	if hasAbbrev {
+	hasStatus := numberedMenuRowsHaveStatus(rows)
+	hasAbbrev := !hasStatus && numberedMenuRowsHaveAbbrev(rows)
+	maxMid := 0
+	if hasStatus {
 		for _, r := range rows {
-			if len(r.Abbrev) > maxAbbrev {
-				maxAbbrev = len(r.Abbrev)
+			if w := ui.VisibleWidth(r.Status); w > maxMid {
+				maxMid = w
+			}
+		}
+	} else if hasAbbrev {
+		for _, r := range rows {
+			if w := ui.VisibleWidth(r.Abbrev); w > maxMid {
+				maxMid = w
 			}
 		}
 	}
+	maxNum := 0
 	for _, r := range rows {
-		numCol := ui.Bold(r.Num)
-		if hasAbbrev {
-			abbrCol := padPlain(r.Abbrev, maxAbbrev)
+		if len(r.Num) > maxNum {
+			maxNum = len(r.Num)
+		}
+	}
+	helpIndent := 4 + maxNum + 3 + maxMid + 3
+	for _, r := range rows {
+		numCol := ui.Bold(padPlain(r.Num, maxNum))
+		if hasStatus {
+			midPlain := padVisible(r.Status, maxMid)
+			mid := midPlain
+			if strings.TrimSpace(r.Status) != "" && !strings.Contains(r.Status, "\033") {
+				mid = ui.Dim(midPlain)
+			}
+			fmt.Printf("    %s | %s | %s\n", numCol, mid, r.Desc)
+		} else if hasAbbrev {
+			abbrCol := padVisible(r.Abbrev, maxMid)
 			if strings.TrimSpace(r.Abbrev) != "" {
-				abbrCol = ui.Abbrev(padPlain(r.Abbrev, maxAbbrev))
+				abbrCol = ui.Abbrev(abbrCol)
 			}
 			fmt.Printf("    %s | %s | %s\n", numCol, abbrCol, r.Desc)
 		} else {
 			fmt.Printf("    %s | %s\n", numCol, r.Desc)
 		}
 		if r.HelpLine != "" {
-			fmt.Printf("         %s\n", ui.Dim(r.HelpLine))
+			fmt.Printf("%s%s\n", strings.Repeat(" ", helpIndent), ui.Faint(r.HelpLine))
 		}
 	}
 }
@@ -307,6 +338,14 @@ func padPlain(s string, width int) string {
 		return s
 	}
 	return s + strings.Repeat(" ", width-len(s))
+}
+
+func padVisible(s string, width int) string {
+	w := ui.VisibleWidth(s)
+	if w >= width {
+		return s
+	}
+	return s + strings.Repeat(" ", width-w)
 }
 
 func canSelfUpdate(projectRoot string) bool {

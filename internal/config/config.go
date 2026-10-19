@@ -197,6 +197,38 @@ func (p *Project) AddCommand(cmd Command) error {
 	return nil
 }
 
+// RenameCommand changes a command's alias and updates precursor references and usage counts.
+func (p *Project) RenameCommand(oldAlias, newAlias string) error {
+	oldAlias = strings.TrimSpace(oldAlias)
+	newAlias = strings.TrimSpace(newAlias)
+	if oldAlias == "" || newAlias == "" {
+		return errors.New("command name is required")
+	}
+	if strings.EqualFold(oldAlias, newAlias) {
+		return nil
+	}
+	if p.FindCommand(newAlias) != nil {
+		return fmt.Errorf("command %q already exists", newAlias)
+	}
+	cmd := p.FindCommand(oldAlias)
+	if cmd == nil {
+		return fmt.Errorf("no command %q", oldAlias)
+	}
+	for i := range p.Commands {
+		if strings.EqualFold(p.Commands[i].Precursor, oldAlias) {
+			p.Commands[i].Precursor = newAlias
+		}
+	}
+	if p.CommandUsage != nil {
+		if n, ok := p.CommandUsage[oldAlias]; ok {
+			p.CommandUsage[newAlias] = n
+			delete(p.CommandUsage, oldAlias)
+		}
+	}
+	cmd.Alias = newAlias
+	return nil
+}
+
 func (p *Project) RemoveCommand(alias string) bool {
 	for i := range p.Commands {
 		if p.Commands[i].Alias == alias {

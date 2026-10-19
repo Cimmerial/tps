@@ -12,7 +12,7 @@ func TestPreferencesRoundTrip(t *testing.T) {
 
 	on := true
 	prefs := &Preferences{
-		Logo:         "pixel",
+		Logo:         "block",
 		Accent:       "magenta",
 		ColorEnabled: &on,
 	}
@@ -27,7 +27,7 @@ func TestPreferencesRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if loaded.Logo != "pixel" || loaded.Accent != "magenta" {
+	if loaded.Logo != "block" || loaded.Accent != "magenta" {
 		t.Fatalf("loaded %+v", loaded)
 	}
 	if loaded.ColorEnabled == nil || !*loaded.ColorEnabled {
@@ -40,9 +40,11 @@ func TestNormalizeLogoID(t *testing.T) {
 		"":          "default",
 		"default":   "default",
 		"titlecard": "default",
-		"classic":   "classic",
-		"tps_dots":  "tps_slash",
-		"pixel":     "pixel",
+		"random":    "random",
+		"classic":   "baby",
+		"wire":      "goopy",
+		"tps_dots":  "poker_face",
+		"pixel":     "block",
 	}
 	for in, want := range tests {
 		if got := NormalizeLogoID(in); got != want {
@@ -67,11 +69,15 @@ func TestPreferencesLogoID(t *testing.T) {
 		t.Fatalf("empty LogoID() = %q want default", empty.LogoID())
 	}
 	p := &Preferences{TitleCard: "o_bird"}
-	if p.LogoID() != "o_bird" {
+	if p.LogoID() != "people" {
 		t.Fatalf("LogoID() = %q", p.LogoID())
 	}
 	p2 := &Preferences{Logo: "wire"}
-	if p2.LogoID() != "wire" {
+	if p2.LogoID() != "goopy" {
 		t.Fatalf("LogoID() = %q", p2.LogoID())
+	}
+	p3 := &Preferences{Logo: "random"}
+	if p3.LogoID() != "random" {
+		t.Fatalf("LogoID() = %q", p3.LogoID())
 	}
 }

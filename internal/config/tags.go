@@ -72,6 +72,51 @@ func splitTagList(s string) []string {
 	return out
 }
 
+// ProjectTags returns distinct non-empty tags used by commands, sorted.
+func (p *Project) ProjectTags() []string {
+	if p == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	for _, c := range p.Commands {
+		for _, t := range c.Tags {
+			t = strings.TrimSpace(t)
+			if t != "" {
+				seen[t] = true
+			}
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for t := range seen {
+		out = append(out, t)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// RenameTag renames old to new in every command's tag list; returns commands updated.
+func (p *Project) RenameTag(old, new string) int {
+	old = strings.TrimSpace(old)
+	new = strings.TrimSpace(new)
+	if old == "" || new == "" || old == new {
+		return 0
+	}
+	n := 0
+	for i := range p.Commands {
+		changed := false
+		for j, t := range p.Commands[i].Tags {
+			if strings.TrimSpace(t) == old {
+				p.Commands[i].Tags[j] = new
+				changed = true
+			}
+		}
+		if changed {
+			n++
+		}
+	}
+	return n
+}
+
 // CommandsByTag returns commands grouped by PrimaryTag; untagged first, then tags A–Z.
 func (p *Project) CommandsByTag() []CommandGroup {
 	if p == nil || len(p.Commands) == 0 {

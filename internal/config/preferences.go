@@ -79,8 +79,31 @@ func NormalizeLogoID(id string) string {
 		return "default"
 	case "logo", "titlecard", "title-card":
 		return "default"
-	case "tps_dots":
-		return "tps_slash"
+	case "random":
+		return "random"
+	// legacy preset ids → README names
+	case "classic":
+		return "baby"
+	case "wire":
+		return "goopy"
+	case "o_bird":
+		return "people"
+	case "dollar":
+		return "dolla_dolla_bill_yall"
+	case "tps_blocks":
+		return "boring"
+	case "tps_gradient":
+		return "blurry"
+	case "tps_slash", "tps_dots":
+		return "poker_face"
+	case "pixel":
+		return "block"
+	case "slashes":
+		return "topo"
+	case "oo":
+		return "lowkey_cool"
+	case "sss":
+		return "sharp"
 	default:
 		if id == "" {
 			return "default"
