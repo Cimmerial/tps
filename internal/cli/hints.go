@@ -28,6 +28,7 @@ func allBuiltInHints(p *config.Project) []hintEntry {
 		}},
 		{key: "quit", abbr: "q", label: "quit", order: 3, show: func(*config.Project) bool { return true }},
 		{key: "switch", abbr: "p", label: "project", order: 4, show: func(*config.Project) bool { return true }},
+		{key: "switch_back", abbr: "pb", label: "back", order: 4, show: func(*config.Project) bool { return true }},
 		{key: "clear", abbr: "tps", label: "refresh", order: 5, show: func(*config.Project) bool { return true }},
 		{key: "new_command", abbr: "nc", label: "new cmd", order: 6, show: func(*config.Project) bool { return true }},
 		{key: "options", abbr: "o", label: "options", order: 7, show: func(*config.Project) bool { return true }},
@@ -151,6 +152,8 @@ func metaKeyForAction(action InputAction) string {
 		return "git"
 	case ActionSwitchProject:
 		return "switch"
+	case ActionSwitchProjectBack:
+		return "switch_back"
 	case ActionInstallHelp:
 		return "install_help"
 	case ActionNewCommand:

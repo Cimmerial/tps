@@ -28,6 +28,15 @@ func CopyToClipboard(text string) error {
 			return cmd.Run()
 		}
 		return fmt.Errorf("install wl-copy or xclip for clipboard support")
+	case "windows":
+		cmd := exec.Command("powershell", "-NoProfile", "-Command", "Set-Clipboard -Value $input")
+		cmd.Stdin = strings.NewReader(text)
+		if err := cmd.Run(); err != nil {
+			clip := exec.Command("clip")
+			clip.Stdin = strings.NewReader(text)
+			return clip.Run()
+		}
+		return nil
 	default:
 		return fmt.Errorf("clipboard copy not supported on %s", runtime.GOOS)
 	}

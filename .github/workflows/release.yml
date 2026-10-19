@@ -1,0 +1,47 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build matrix
+        run: |
+          set -euo pipefail
+          ver="${GITHUB_REF_NAME#v}"
+          out=dist
+          rm -rf "$out"
+          mkdir -p "$out"
+          for pair in darwin:amd64 darwin:arm64 linux:amd64 linux:arm64 windows:amd64; do
+            goos="${pair%%:*}"
+            goarch="${pair##*:}"
+            name="tps_${ver}_${goos}_${goarch}"
+            ext=""
+            bin="tps"
+            if [ "$goos" = windows ]; then
+              ext=".exe"
+              bin="tps.exe"
+            fi
+            GOOS=$goos GOARCH=$goarch CGO_ENABLED=0 go build -ldflags "-X github.com/Cimmerial/tps/internal/version.Version=v${ver}" -o "$out/$bin" ./cmd/tps
+            if [ "$goos" = windows ]; then
+              (cd "$out" && zip -q "${name}.zip" "$bin")
+            else
+              tar -czf "$out/${name}.tar.gz" -C "$out" "tps"
+            fi
+            rm -f "$out/tps" "$out/tps.exe"
+          done
+          (cd "$out" && sha256sum *.tar.gz *.zip > SHA256SUMS)
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*

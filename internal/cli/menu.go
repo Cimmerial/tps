@@ -26,6 +26,7 @@ const (
 	ActionGitShip
 	ActionGit
 	ActionSwitchProject
+	ActionSwitchProjectBack
 	ActionInstallHelp
 	ActionNewCommand
 	ActionTerminalCheck
@@ -42,9 +43,7 @@ type MenuInput struct {
 	Alias       string
 	ShellInputs []string
 	Text        string
-	UpdateAll   bool
 	ExportAll   bool
-	InstallCopy bool
 	SetupName   string
 	SetupPath   string
 	NewCmd      config.Command
@@ -115,6 +114,7 @@ func printFullHelp(p *config.Project) {
 				cmdRow("tps", "tps", "refresh logo and menu at top of screen"),
 				cmdRow("quit", "q", "exit tps"),
 				cmdRow("project", "p · p1", "switch linked project (p1, p2, … or p name)"),
+				cmdRow("pb", "", "switch back to previous project"),
 				cmdRow("options", "o", "logo/color, terminal colors, capture sms"),
 				cmdRow("close all terms", "vite", "macOS: kill tab processes and close every Terminal.app window"),
 			},
@@ -142,8 +142,7 @@ func printFullHelp(p *config.Project) {
 		sections = append(sections, helpSection{
 			title: "update",
 			rows: []helpRow{
-				cmdRow("update", "u", "git pull tps repo, rebuild, sync every tps on this machine"),
-				cmdRow("update all", "u -a", "same as u (git pull, rebuild, sync all binaries)"),
+				cmdRow("update", "u", "git pull + rebuild (dev repo) or GitHub release; sync PATH binaries + TPS.md"),
 			},
 		})
 	}
@@ -161,8 +160,7 @@ func printFullHelp(p *config.Project) {
 		title: "help",
 		rows: []helpRow{
 			cmdRow("help", "h", "this list"),
-			cmdRow("install", "ih", "install & update tps on this or another machine"),
-			cmdRow("install copy", "ih -copy", "copy install commands to clipboard"),
+			cmdRow("install", "ih", "install & link repos on this or another machine"),
 		},
 	})
 
@@ -395,6 +393,8 @@ func resolveMenuInput(cfg *config.Config, p *config.Project, line string) (MenuI
 		return MenuInput{Action: ActionConfig}, nil
 	case "p", "projects":
 		return MenuInput{Action: ActionSwitchProject}, nil
+	case "pb":
+		return MenuInput{Action: ActionSwitchProjectBack}, nil
 	case "o", "options":
 		return MenuInput{Action: ActionOptions}, nil
 	case "vite", "close all terms":
@@ -454,25 +454,10 @@ func resolveMenuInput(cfg *config.Config, p *config.Project, line string) (MenuI
 			return parseTerminalCheck(fields)
 		}
 		if isInstallHelpToken(fields[0]) {
-			copyClip := false
-			for _, f := range fields[1:] {
-				if f == "-copy" || f == "--copy" {
-					copyClip = true
-				}
-			}
-			return MenuInput{Action: ActionInstallHelp, InstallCopy: copyClip}, nil
+			return MenuInput{Action: ActionInstallHelp}, nil
 		}
 		if strings.EqualFold(fields[0], "u") || strings.EqualFold(fields[0], "update") {
-			if devRepoRoot(cfg, p) == "" {
-				return MenuInput{}, fmt.Errorf("update needs the tps dev repo linked (tps project add from the tps repo)")
-			}
-			all := false
-			for _, f := range fields[1:] {
-				if f == "-a" || f == "--all" {
-					all = true
-				}
-			}
-			return MenuInput{Action: ActionUpdate, UpdateAll: all}, nil
+			return MenuInput{Action: ActionUpdate}, nil
 		}
 		if isNewCommandToken(fields[0]) || (len(fields) >= 2 && isNewCommandPhrase(fields[0], fields[1])) {
 			flagFields := fields[1:]

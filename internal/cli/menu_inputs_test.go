@@ -54,6 +54,16 @@ func TestResolveMenuInputProjectByIndex(t *testing.T) {
 	}
 }
 
+func TestResolveMenuInputProjectBack(t *testing.T) {
+	in, err := resolveMenuInput(nil, &config.Project{}, "pb")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in.Action != ActionSwitchProjectBack {
+		t.Fatalf("pb: %+v", in)
+	}
+}
+
 func TestResolveMenuInputCommandWithShellInputs(t *testing.T) {
 	p := &config.Project{
 		Commands: []config.Command{

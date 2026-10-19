@@ -8,8 +8,8 @@ import (
 	"github.com/Cimmerial/tps/internal/config"
 )
 
-// ReadmeRelSource is the canonical doc in the tps dev repo. Update it when behavior or limits change.
-const ReadmeRelSource = "instance/README.md"
+// ReadmeRelSource is the canonical doc path in a tps dev clone (for editors).
+const ReadmeRelSource = "internal/instance/README.md"
 
 // ReadmeDestName is written at the root of each linked app repo.
 const ReadmeDestName = "TPS.md"
@@ -34,20 +34,38 @@ func DevRepoRoot(cfg *config.Config) string {
 	return ""
 }
 
+func readmeBytes(tpsRepo string) ([]byte, error) {
+	if tpsRepo != "" {
+		for _, rel := range []string{ReadmeRelSource, "instance/README.md"} {
+			src := filepath.Join(tpsRepo, rel)
+			data, err := os.ReadFile(src)
+			if err == nil {
+				return data, nil
+			}
+			if !os.IsNotExist(err) {
+				return nil, fmt.Errorf("read instance readme: %w", err)
+			}
+		}
+	}
+	if len(EmbeddedReadme()) > 0 {
+		return EmbeddedReadme(), nil
+	}
+	return nil, nil
+}
+
 func SyncProject(tpsRepo, projectRoot string) (bool, error) {
-	if tpsRepo == "" || projectRoot == "" {
+	if projectRoot == "" {
 		return false, nil
 	}
 	if IsDevRepo(projectRoot) {
 		return false, nil
 	}
-	src := filepath.Join(tpsRepo, ReadmeRelSource)
-	data, err := os.ReadFile(src)
+	data, err := readmeBytes(tpsRepo)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, fmt.Errorf("read instance readme: %w", err)
+		return false, err
+	}
+	if len(data) == 0 {
+		return false, nil
 	}
 	dst := filepath.Join(projectRoot, ReadmeDestName)
 	if err := os.WriteFile(dst, data, 0o644); err != nil {
@@ -57,7 +75,7 @@ func SyncProject(tpsRepo, projectRoot string) (bool, error) {
 }
 
 func SyncAllLinked(tpsRepo string, cfg *config.Config) (int, error) {
-	if cfg == nil || tpsRepo == "" {
+	if cfg == nil {
 		return 0, nil
 	}
 	n := 0

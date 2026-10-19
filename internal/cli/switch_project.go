@@ -65,6 +65,23 @@ func findProjectID(cfg *config.Config, query string) string {
 	return ""
 }
 
+// applyInteractiveProjectSwitch moves the session to newID when it differs from projectID.
+// It returns the updated project and back-target ids.
+func applyInteractiveProjectSwitch(selected *config.Project, projectID, prevProjectID, newID string, statusTick int) (string, string, error) {
+	if newID == "" || newID == projectID {
+		return projectID, prevProjectID, nil
+	}
+	prevName := selected.Name
+	backTarget := projectID
+	if err := config.SaveSessionProjectID(newID); err != nil {
+		return projectID, prevProjectID, err
+	}
+	if err := refreshInteractiveSession(newID, statusTick, prevName, false); err != nil {
+		return projectID, prevProjectID, err
+	}
+	return newID, backTarget, nil
+}
+
 func parsePickIndex(line string, max int) (int, error) {
 	var n int
 	_, err := fmt.Sscanf(line, "%d", &n)

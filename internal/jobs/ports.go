@@ -1,9 +1,6 @@
 package jobs
 
-import (
-	"os/exec"
-	"regexp"
-)
+import "regexp"
 
 var portFlagRE = regexp.MustCompile(`(?:--port|-p)\s+(\d+)`)
 
@@ -20,11 +17,5 @@ func killPortsFromShell(shell string) []string {
 		}
 	}
 	return freed
-}
-
-func killPort(port string) bool {
-	script := "lsof -ti tcp:" + port + " 2>/dev/null | xargs kill -9 2>/dev/null"
-	err := exec.Command("sh", "-c", script).Run()
-	return err == nil
 }
 

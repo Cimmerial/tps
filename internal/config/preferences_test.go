@@ -9,12 +9,19 @@ import (
 
 func TestPreferencesRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("HOME", dir)
 	var tpsDir string
-	if runtime.GOOS == "darwin" {
+	switch runtime.GOOS {
+	case "darwin":
+		t.Setenv("HOME", dir)
 		tpsDir = filepath.Join(dir, "Library", "Application Support", "tps")
-	} else {
-		tpsDir = filepath.Join(dir, ".config", "tps")
+	case "windows":
+		appData := filepath.Join(dir, "AppData", "Roaming")
+		t.Setenv("APPDATA", appData)
+		tpsDir = filepath.Join(appData, "tps")
+	default:
+		cfg := filepath.Join(dir, ".config")
+		t.Setenv("XDG_CONFIG_HOME", cfg)
+		tpsDir = filepath.Join(cfg, "tps")
 	}
 	if err := os.MkdirAll(tpsDir, 0o700); err != nil {
 		t.Fatal(err)

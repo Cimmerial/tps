@@ -74,6 +74,9 @@ func openInEditor(path string) error {
 	if runtime.GOOS == "darwin" {
 		return runEditor("open", []string{"-t", path})
 	}
+	if runtime.GOOS == "windows" {
+		return runEditor("notepad", []string{path})
+	}
 	return runEditor("nano", []string{path})
 }
 

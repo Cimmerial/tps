@@ -5,9 +5,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/Cimmerial/tps/internal/config"
+	"github.com/Cimmerial/tps/internal/install"
 	"github.com/Cimmerial/tps/internal/instance"
 	"github.com/Cimmerial/tps/internal/project"
 	"github.com/Cimmerial/tps/internal/ui"
@@ -21,7 +21,7 @@ var setupPath string
 var setupCmd = &cobra.Command{
 	Use:   "setup",
 	Short: "Install/update tps and link a project (run from the app repo)",
-	Long:  "Runs the same steps as the ih -copy install script: go install from your linked tps dev repo, ensure Go bin is on PATH in ~/.zshrc, then link the project.",
+	Long:  "Install or update tps from your linked dev repo when present, ensure Go bin is on PATH in ~/.zshrc, link the project, and refresh TPS.md.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runSetup(setupName, setupPath)
 	},
@@ -62,7 +62,7 @@ func runSetup(nameOverride, pathOverride string) error {
 		return nil
 	}
 
-	tpsRepo, _ := installCopyRoots(cfg, nil, cwd)
+	tpsRepo := devRepoRoot(cfg, nil)
 	if tpsRepo != "" {
 		spin := ui.NewSpinner("installing tps")
 		result, err := update.InstallFromProjectRoot(tpsRepo)
@@ -79,10 +79,10 @@ func runSetup(nameOverride, pathOverride string) error {
 		fmt.Println(ui.Dim("skip install: link the tps dev repo in config first (tps project add from the tps repo)"))
 	}
 
-	if err := ensurePathInZshrc(); err != nil {
+	if err := install.EnsureOnPath(); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", ui.Dim("PATH: "+err.Error()))
 	} else {
-		fmt.Println(ui.Dim("PATH ok (GOPATH/bin in ~/.zshrc)"))
+		fmt.Println(ui.Dim("PATH ok"))
 	}
 
 	if _, err := exec.LookPath("tps"); err != nil {
@@ -119,43 +119,10 @@ func linkProjectAt(cfg *config.Config, linkDir, name string) (*config.Project, e
 	if err := ensureDevProjectCommands(cfg, linked); err != nil {
 		return linked, err
 	}
-	if tpsRepo := instance.DevRepoRoot(cfg); tpsRepo != "" {
-		if _, err := instance.SyncProject(tpsRepo, linked.Path); err != nil {
-			return linked, err
-		}
+	tpsRepo := instance.DevRepoRoot(cfg)
+	if _, err := instance.SyncProject(tpsRepo, linked.Path); err != nil {
+		return linked, err
 	}
 	return linked, nil
 }
 
-func ensurePathInZshrc() error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-	zshrc := filepath.Join(home, ".zshrc")
-	var content []byte
-	if data, err := os.ReadFile(zshrc); err != nil {
-		if !os.IsNotExist(err) {
-			return err
-		}
-	} else {
-		content = data
-	}
-	if strings.Contains(string(content), "GOPATH/bin") {
-		return nil
-	}
-	line := "export PATH=\"$PATH:$(go env GOPATH)/bin\"\n"
-	f, err := os.OpenFile(zshrc, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	if _, err := f.WriteString(line); err != nil {
-		return err
-	}
-	return nil
-}
-
-func execLookPathTps() (string, error) {
-	return os.Getenv("PATH"), nil // weak check - use exec.LookPath
-}

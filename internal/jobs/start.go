@@ -118,12 +118,12 @@ func launchShell(p *config.Project, alias, shell string, recordHistory bool) (Jo
 				tty = strings.TrimSpace(string(data))
 			}
 		}
-		if pid > 0 && tty != "" {
+		if launchReady(pid, tty) {
 			break
 		}
 	}
 	if pid == 0 {
-		return Job{}, fmt.Errorf("started terminal but could not read process id (check Terminal.app)")
+		return Job{}, fmt.Errorf("started terminal but could not read process id (check terminal or logs)")
 	}
 
 	job := Job{

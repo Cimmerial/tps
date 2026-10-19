@@ -28,8 +28,7 @@ TPS is a **personal project command hub**: one interactive CLI where linked repo
 | Mechanism | Purpose |
 |-----------|---------|
 | `tps project add` / `add --path` | Link a repo (name defaults to folder). |
-| `tps setup` / `tps setup -n name` | Install/update `tps`, PATH hint, link cwd (or path). |
-| `ih -copy` | Paste-safe script: install from tps repo + `tps setup --path …` (run `ih -copy` from the **app** repo). |
+| `tps setup` / `tps setup -n name` | Install/update `tps`, PATH hint, link cwd (or path), refresh `TPS.md`. |
 | Git remote + path in YAML | **Heal** when folder moves (`ResolveFromCwd`). |
 
 ### Project commands
@@ -56,12 +55,12 @@ Defined in config per project: `alias`, `shell`, `abbreviation`, optional `descr
 | `h` | Help |
 | `c` | Open config in Cursor/VS Code/`$EDITOR` (GUI editors non-blocking) |
 | `p` | Switch project |
-| `u` / `u -a` | `go install` from **linked tps dev repo** (works from any project), restart; `-a` sync all `tps` on PATH |
+| `u` | Pull dev repo (if linked), rebuild, sync all `tps` on PATH, refresh `TPS.md`, restart |
 | `g ship` / `git ship` | git add/commit/push (`gs` legacy) |
 | `g …` / `git …` | Git passthrough |
 | `export` / `export -a` | Export current project or all to YAML |
 | `import <file>` | Merge project(s) from export file |
-| `ih` / `ih -copy` | Install docs / clipboard script |
+| `ih` | Install / link / update help |
 | `tps` | Clear visible screen and redraw menu at top (keeps scrollback) |
 | `clear` | Clear terminal scrollback + refresh (VS Code Cmd+K style) |
 | `q` | Quit |
@@ -94,11 +93,11 @@ internal/ui      → logo, colors, spinner, clipboard, prompt
 
 ## Instance README (`TPS.md`)
 
-Each **linked app repo** gets `TPS.md` at its root: how tps works here, limitations, and common keys. The canonical source is **`instance/README.md` in this repo** (not the ASCII-art `README.md`).
+Each **linked app repo** gets `TPS.md` at its root: how tps works here, limitations, and common keys. The canonical source is **`internal/instance/README.md`** (not the ASCII-art `README.md`).
 
-**When you change behavior, menus, detach/capture, or documented limits:** edit `instance/README.md`, then ship tps. Copies refresh when users run `tps setup`, link a project (`tps project add`), or update tps (`u` / auto-update after a rebuilt binary).
+**When you change behavior, menus, detach/capture, or documented limits:** edit `internal/instance/README.md`, then ship tps. Copies refresh when users run `tps setup`, link a project (`tps project add`), or update tps (`u` / auto-update after a rebuilt binary).
 
-Implementation: `internal/instance` copies `instance/README.md` → `<project>/TPS.md`.
+Implementation: `internal/instance` embeds that doc into release binaries and writes `<project>/TPS.md`.
 
 ---
 
@@ -120,10 +119,10 @@ Implementation: `internal/instance` copies `instance/README.md` → `<project>/T
 | Stay-open REPL + usage-sorted menus | **Done** |
 | Open/manage other terminals | **Done** (detach, t, kill, restart, capture) |
 | Sequences + wait for events | **Partial** (`capture` regex); no generic step runner yet |
-| Export/import projects & commands | **Partial** (copy `config.yaml`; `ih -copy` / `setup`); no `tps export` command |
+| Export/import projects & commands | **Done** (`export` / `import` / `setup`) |
 | Run `tps` from anywhere on PATH | **Done** (`go install`, `ih` PATH line) |
 | Stable identity when project moves | **Done** (git remote + path heal) |
-| New machine bootstrap | **Done** (`setup`, `ih -copy`, optional config copy) |
+| New machine bootstrap | **Done** (`setup`, `ih`, install scripts, optional config copy) |
 | Xcode / GUI build from CLI | **Not started** |
 | iTerm vs Terminal, Linux terminals | **Not started** (Terminal.app only for detach) |
 | `TPS_DEBUG` / structured logging | **Not started** (kill debug removed after validation) |

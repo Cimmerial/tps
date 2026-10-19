@@ -81,11 +81,23 @@ func printConfigExamples() {
   nc -n admin -a adm -c "./script.sh" -tags admin -precursor fas`,
 		},
 		{
+			title: "detach + close tab (macOS)",
+			body: `      - alias: once
+        shell: ./scripts/seed.sh
+        detach: true
+        close_on_complete: true`,
+		},
+		{
+			title: "TPS.md (linked app repos)",
+			body: `  # Auto-written at repo root on setup / project add / u
+  # Source of truth: internal/instance/README.md in the tps dev repo`,
+		},
+		{
 			title: "setup / export / import",
-			body: `  setup              # link cwd (from app repo)
+			body: `  setup              # link cwd, refresh TPS.md
   setup -n Clastone --path ~/dev/Clastone
   export             # writes ./ProjectName.tps.yaml
-  export -a            # all projects → tps-export.yaml
+  export -a          # all projects → tps-export.yaml
   import backup.tps.yaml`,
 		},
 	}

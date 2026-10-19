@@ -99,6 +99,7 @@ func runInteractive() error {
 	printSessionHeader(selected, projectID, restartBanner, "", statusTick)
 
 	gapBeforePrompt := false
+	prevProjectID := ""
 	for {
 		active, _ := jobs.Reap(projectID)
 		line, err := readLine(reader, projectID, statusTick, gapBeforePrompt)
@@ -136,13 +137,7 @@ func runInteractive() error {
 		case ActionInstallHelp:
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
-			if input.InstallCopy {
-				if err := copyInstallCommands(cfg, selected); err != nil {
-					fmt.Fprintf(os.Stderr, "ih: %v\n", err)
-				}
-			} else {
-				printInstallHelp()
-			}
+			printInstallHelp()
 		case ActionClear:
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
@@ -171,11 +166,7 @@ func runInteractive() error {
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
 			root := devRepoRoot(cfg, selected)
-			if root == "" {
-				fmt.Fprintf(os.Stderr, "update: link the tps dev repo first (tps project add from the tps repo)\n")
-				continue
-			}
-			if err := update.InstallAndRestart(root, input.UpdateAll); err != nil {
+			if err := update.InstallAndRestart(root); err != nil {
 				fmt.Fprintf(os.Stderr, "update: %v\n", err)
 			}
 		case ActionEdit:
@@ -192,15 +183,20 @@ func runInteractive() error {
 				fmt.Fprintf(os.Stderr, "project: %v\n", err)
 				continue
 			}
-			if newID != "" {
-				prevProjectName := selected.Name
-				projectID = newID
-				if err := config.SaveSessionProjectID(projectID); err != nil {
-					return err
-				}
-				if err := refreshInteractiveSession(projectID, statusTick, prevProjectName, false); err != nil {
-					return err
-				}
+			projectID, prevProjectID, err = applyInteractiveProjectSwitch(selected, projectID, prevProjectID, newID, statusTick)
+			if err != nil {
+				return err
+			}
+		case ActionSwitchProjectBack:
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
+			if prevProjectID == "" {
+				fmt.Fprintf(os.Stderr, "pb: no previous project\n")
+				continue
+			}
+			projectID, prevProjectID, err = applyInteractiveProjectSwitch(selected, projectID, prevProjectID, prevProjectID, statusTick)
+			if err != nil {
+				return err
 			}
 		case ActionGitShip:
 			recordMetaUse(cfg, selected, input.Action)

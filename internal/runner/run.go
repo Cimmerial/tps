@@ -28,7 +28,7 @@ func RunScript(p *config.Project, script string) (int, error) {
 	if script == "" {
 		return 0, nil
 	}
-	c := exec.Command("sh", "-c", script)
+	c := scriptCommand(script)
 	c.Dir = p.Path
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout

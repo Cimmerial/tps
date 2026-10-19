@@ -97,12 +97,37 @@ func fileFingerprint(path string) (string, error) {
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
 
-func InstallAndRestart(root string, _ bool) error {
+func InstallAndRestart(root string) error {
+	var result InstallResult
+	var err error
+	if root == "" {
+		result, err = InstallFromGitHubRelease()
+		if err != nil {
+			return err
+		}
+		source, err := exec.LookPath("tps")
+		if err != nil {
+			source, _ = os.Executable()
+		}
+		synced, err := syncAllInstances("", source)
+		if err != nil {
+			return err
+		}
+		if len(synced) > 0 {
+			fmt.Println(ui.Dim(fmt.Sprintf("synced %d other install(s)", len(synced))))
+		}
+		updated := result.Updated || len(synced) > 0
+		syncInstanceReadmes("")
+		if err := RestartInteractive(updated); err != nil {
+			return fmt.Errorf("restart failed: %w (run tps again)", err)
+		}
+		return nil
+	}
+
 	if err := PullFastForward(root); err != nil {
 		return err
 	}
-
-	result, err := InstallFromProjectRoot(root)
+	result, err = InstallFromProjectRoot(root)
 	if err != nil {
 		return err
 	}
