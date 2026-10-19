@@ -33,6 +33,7 @@ const (
 	ActionImport
 	ActionSetup
 	ActionConfigExamples
+	ActionOptions
 )
 
 type MenuInput struct {
@@ -61,8 +62,18 @@ func truncateRunes(s string, max int) string {
 	return s[:max-3] + "..."
 }
 
-func printSessionHeader(p *config.Project, projectID string, restartBanner string, statusTick int) {
-	name := ui.Bold(ui.Magenta(p.Name))
+func formatSessionProjectLine(currentName, prevName string) string {
+	current := ui.Bold(ui.Magenta(strings.TrimSpace(currentName)))
+	prevName = strings.TrimSpace(prevName)
+	if prevName == "" {
+		return current
+	}
+	prev := ui.Bold(ui.Magenta(prevName))
+	return prev + ui.Dim(" -> ") + current
+}
+
+func printSessionHeader(p *config.Project, projectID string, restartBanner string, prevProjectName string, statusTick int) {
+	name := formatSessionProjectLine(p.Name, prevProjectName)
 	switch restartBanner {
 	case "updated":
 		fmt.Printf("%s %s %s\n", ui.Header("project:"), name, ui.Green("- tps updated"))
@@ -100,6 +111,7 @@ func printFullHelp(p *config.Project) {
 				cmdRow("clear", "tps", "reset screen and menu"),
 				cmdRow("quit", "q", "exit tps"),
 				cmdRow("project", "p", "switch linked project"),
+				cmdRow("options", "o", "title card logo/color, terminal colors"),
 			},
 		},
 		{
@@ -174,22 +186,19 @@ type helpSection struct {
 	rows  []helpRow
 }
 
-func printTPSCommandHelp(sections []helpSection) {
-	maxCmd, maxAbbrev := 0, 0
-	for _, sec := range sections {
-		for _, r := range sec.rows {
-			if r.tip {
-				continue
-			}
-			if len(r.command) > maxCmd {
-				maxCmd = len(r.command)
-			}
-			if len(r.abbrev) > maxAbbrev {
-				maxAbbrev = len(r.abbrev)
-			}
+func helpSectionHasAbbrev(rows []helpRow) bool {
+	for _, r := range rows {
+		if r.tip {
+			continue
+		}
+		if strings.TrimSpace(r.abbrev) != "" {
+			return true
 		}
 	}
+	return false
+}
 
+func printTPSCommandHelp(sections []helpSection) {
 	fmt.Println()
 	fmt.Printf("%s\n", ui.Header("TPS commands"))
 	for i, sec := range sections {
@@ -197,6 +206,19 @@ func printTPSCommandHelp(sections []helpSection) {
 			fmt.Println()
 		}
 		fmt.Printf("%s\n", ui.SubHeader(sec.title))
+		maxCmd, maxAbbrev := 0, 0
+		hasAbbrev := helpSectionHasAbbrev(sec.rows)
+		for _, r := range sec.rows {
+			if r.tip {
+				continue
+			}
+			if len(r.command) > maxCmd {
+				maxCmd = len(r.command)
+			}
+			if hasAbbrev && len(r.abbrev) > maxAbbrev {
+				maxAbbrev = len(r.abbrev)
+			}
+		}
 		var printedTips bool
 		var hadCommands bool
 		for _, r := range sec.rows {
@@ -212,12 +234,17 @@ func printTPSCommandHelp(sections []helpSection) {
 				continue
 			}
 			cmdCol := ui.Bold(padPlain(r.command, maxCmd))
-			abbrPlain := padPlain(r.abbrev, maxAbbrev)
-			abbrCol := abbrPlain
-			if strings.TrimSpace(r.abbrev) != "" {
-				abbrCol = ui.Abbrev(padPlain(r.abbrev, maxAbbrev))
+			descCol := ui.Dim(r.description)
+			if hasAbbrev {
+				abbrPlain := padPlain(r.abbrev, maxAbbrev)
+				abbrCol := abbrPlain
+				if strings.TrimSpace(r.abbrev) != "" {
+					abbrCol = ui.Abbrev(padPlain(r.abbrev, maxAbbrev))
+				}
+				fmt.Printf("    %s | %s | %s\n", cmdCol, abbrCol, descCol)
+			} else {
+				fmt.Printf("    %s | %s\n", cmdCol, descCol)
 			}
-			fmt.Printf("    %s | %s | %s\n", cmdCol, abbrCol, ui.Dim(r.description))
 			hadCommands = true
 		}
 	}
@@ -229,6 +256,49 @@ func isInstallHelpToken(tok string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+type numberedMenuRow struct {
+	Num      string
+	Abbrev   string
+	Desc     string
+	HelpLine string
+}
+
+func numberedMenuRowsHaveAbbrev(rows []numberedMenuRow) bool {
+	for _, r := range rows {
+		if strings.TrimSpace(r.Abbrev) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func printNumberedMenuRows(rows []numberedMenuRow) {
+	hasAbbrev := numberedMenuRowsHaveAbbrev(rows)
+	maxAbbrev := 0
+	if hasAbbrev {
+		for _, r := range rows {
+			if len(r.Abbrev) > maxAbbrev {
+				maxAbbrev = len(r.Abbrev)
+			}
+		}
+	}
+	for _, r := range rows {
+		numCol := ui.Bold(r.Num)
+		if hasAbbrev {
+			abbrCol := padPlain(r.Abbrev, maxAbbrev)
+			if strings.TrimSpace(r.Abbrev) != "" {
+				abbrCol = ui.Abbrev(padPlain(r.Abbrev, maxAbbrev))
+			}
+			fmt.Printf("    %s | %s | %s\n", numCol, abbrCol, r.Desc)
+		} else {
+			fmt.Printf("    %s | %s\n", numCol, r.Desc)
+		}
+		if r.HelpLine != "" {
+			fmt.Printf("         %s\n", ui.Dim(r.HelpLine))
+		}
 	}
 }
 
@@ -279,6 +349,8 @@ func resolveMenuInput(cfg *config.Config, p *config.Project, line string) (MenuI
 		return MenuInput{Action: ActionConfig}, nil
 	case "p", "projects":
 		return MenuInput{Action: ActionSwitchProject}, nil
+	case "o", "options":
+		return MenuInput{Action: ActionOptions}, nil
 	}
 
 	if strings.HasPrefix(low, "p ") {
@@ -287,6 +359,9 @@ func resolveMenuInput(cfg *config.Config, p *config.Project, line string) (MenuI
 	}
 
 	if fields := strings.Fields(line); len(fields) >= 1 {
+		if len(fields) >= 2 && strings.EqualFold(fields[0], "tps") && strings.EqualFold(fields[1], "options") {
+			return MenuInput{Action: ActionOptions}, nil
+		}
 		switch strings.ToLower(fields[0]) {
 		case "tk", "tck":
 			return MenuInput{Action: ActionTerminalCheck, TcKillAll: true}, nil

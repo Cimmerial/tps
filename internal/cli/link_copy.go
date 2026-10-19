@@ -57,26 +57,3 @@ func linkTargetsForCopy(cfg *config.Config, selected *config.Project, cwd string
 	}
 	return out
 }
-
-func tryAutoLinkFromCwd(cfg *config.Config, cwd string) (*config.Project, bool, error) {
-	if len(cfg.Projects) == 0 {
-		return nil, false, nil
-	}
-	root, err := project.ProjectRootFromCwd(cwd)
-	if err != nil || root == "" || canSelfUpdate(root) {
-		return nil, false, nil
-	}
-	clean, err := config.CleanPath(root)
-	if err != nil {
-		return nil, false, err
-	}
-	if cfg.FindByPath(clean) != nil {
-		return nil, false, nil
-	}
-	name := filepath.Base(clean)
-	linked, err := project.LinkFromCwd(cfg, cwd, name)
-	if err != nil {
-		return nil, false, err
-	}
-	return linked, true, nil
-}

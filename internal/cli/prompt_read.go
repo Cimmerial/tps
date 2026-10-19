@@ -20,7 +20,7 @@ func readLine(_ *bufio.Reader, running int, tick int, padBefore bool) (string, e
 
 func needsGapBeforeNextPrompt(action InputAction) bool {
 	switch action {
-	case ActionNoop, ActionQuit, ActionClear, ActionSwitchProject:
+	case ActionNoop, ActionQuit, ActionClear, ActionSwitchProject, ActionOptions:
 		return false
 	default:
 		return true

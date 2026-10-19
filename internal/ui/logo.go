@@ -16,5 +16,5 @@ const SmallLogo = `      ___           ___           ___
 
 func PrintLogo() {
 	fmt.Println()
-	fmt.Println(ColorizeLines(SmallLogo, cyan))
+	fmt.Println(ColorizeLines(logoArt(), titleCardColorCode()))
 }

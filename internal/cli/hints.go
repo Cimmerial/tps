@@ -30,6 +30,7 @@ func allBuiltInHints(p *config.Project) []hintEntry {
 		{key: "clear", abbr: "tps", label: "clear", order: 4, show: func(*config.Project) bool { return true }},
 		{key: "new_command", abbr: "nc", label: "new cmd", order: 5, show: func(*config.Project) bool { return true }},
 		{key: "config", abbr: "c", label: "config", order: 6, show: func(*config.Project) bool { return true }},
+		{key: "options", abbr: "o", label: "options", order: 6, show: func(*config.Project) bool { return true }},
 		{key: "update", abbr: "u", label: "update", order: 7, show: func(p *config.Project) bool {
 			cfg, err := config.Load()
 			if err != nil {
@@ -151,6 +152,8 @@ func metaKeyForAction(action InputAction) string {
 		return "new_command"
 	case ActionTerminalCheck:
 		return "terminals"
+	case ActionOptions:
+		return "options"
 	default:
 		return ""
 	}

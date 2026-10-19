@@ -9,7 +9,6 @@ import (
 
 	"github.com/Cimmerial/tps/internal/config"
 	gittool "github.com/Cimmerial/tps/internal/git"
-	"github.com/Cimmerial/tps/internal/project"
 	"github.com/Cimmerial/tps/internal/jobs"
 	"github.com/Cimmerial/tps/internal/ui"
 	"github.com/Cimmerial/tps/internal/update"
@@ -19,6 +18,10 @@ func runInteractive() error {
 	restartBanner := takeSessionRestartBanner()
 
 	spin := ui.NewSpinner("loading")
+	if err := applyUIPreferences(); err != nil {
+		spin.Stop()
+		return err
+	}
 	cfg, err := config.Load()
 	if err != nil {
 		spin.Stop()
@@ -31,42 +34,34 @@ func runInteractive() error {
 	}
 
 	var projectID string
-	res, resolveErr := project.ResolveFromCwd(cfg, cwd)
+	choice, err := resolveInteractiveProject(cfg, cwd)
 	spin.Stop()
-	if resolveErr == nil {
-		if res.Healed {
-			if err := config.Save(cfg); err != nil {
-				return err
-			}
+	if err != nil {
+		return err
+	}
+	if choice.NoProjects {
+		fmt.Println("no projects linked. Run: tps project add")
+		return nil
+	}
+	if choice.SaveConfig {
+		if err := config.Save(cfg); err != nil {
+			return err
 		}
-		projectID = res.Project.ID
-	} else {
-		if len(cfg.Projects) == 0 {
-			fmt.Println("no projects linked. Run: tps project add")
+	}
+	projectID = choice.ProjectID
+	if choice.Pick {
+		fmt.Println("select a project:")
+		for i, p := range cfg.Projects {
+			fmt.Printf("  %d) %s  %s\n", i+1, p.Name, p.Path)
+		}
+		selected, err := pickProject(cfg)
+		if err != nil {
+			return err
+		}
+		if selected == nil {
 			return nil
 		}
-		if linked, ok, err := tryAutoLinkFromCwd(cfg, cwd); err != nil {
-			return err
-		} else if ok {
-			if err := config.Save(cfg); err != nil {
-				return err
-			}
-			fmt.Println(ui.Green(fmt.Sprintf("linked %q at %s", linked.Name, linked.Path)))
-			projectID = linked.ID
-		} else {
-			fmt.Println("select a project:")
-			for i, p := range cfg.Projects {
-				fmt.Printf("  %d) %s  %s\n", i+1, p.Name, p.Path)
-			}
-			selected, err := pickProject(cfg)
-			if err != nil {
-				return err
-			}
-			if selected == nil {
-				return nil
-			}
-			projectID = selected.ID
-		}
+		projectID = selected.ID
 	}
 
 	reader := bufio.NewReader(os.Stdin)
@@ -92,7 +87,7 @@ func runInteractive() error {
 	statusTick := 0
 	ui.ClearScreen()
 	ui.PrintLogo()
-	printSessionHeader(selected, projectID, restartBanner, statusTick)
+	printSessionHeader(selected, projectID, restartBanner, "", statusTick)
 
 	gapBeforePrompt := false
 	for {
@@ -142,7 +137,7 @@ func runInteractive() error {
 		case ActionClear:
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
-			if err := refreshInteractiveSession(projectID, statusTick); err != nil {
+			if err := refreshInteractiveSession(projectID, statusTick, ""); err != nil {
 				return err
 			}
 		case ActionConfig:
@@ -188,9 +183,10 @@ func runInteractive() error {
 				fmt.Fprintf(os.Stderr, "project: %v\n", err)
 				continue
 			}
-			if newID != "" && newID != projectID {
+			if newID != "" {
+				prevName := selected.Name
 				projectID = newID
-				if err := refreshInteractiveSession(projectID, statusTick); err != nil {
+				if err := refreshInteractiveSession(projectID, statusTick, prevName); err != nil {
 					return err
 				}
 			}
@@ -247,6 +243,12 @@ func runInteractive() error {
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
 			printConfigExamples()
+		case ActionOptions:
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
+			if err := runOptionsMenu(projectID, statusTick); err != nil {
+				fmt.Fprintf(os.Stderr, "options: %v\n", err)
+			}
 		case ActionRun:
 			code, err := executeProjectCommand(selected, input.Alias, input.ShellInputs)
 			if err != nil {
@@ -273,14 +275,14 @@ func runInteractive() error {
 	}
 }
 
-func refreshInteractiveSession(projectID string, statusTick int) error {
+func refreshInteractiveSession(projectID string, statusTick int, prevProjectName string) error {
 	ui.ClearScreen()
 	ui.PrintLogo()
 	_, selected, err := loadProject(projectID)
 	if err != nil {
 		return err
 	}
-	printSessionHeader(selected, projectID, "", statusTick)
+	printSessionHeader(selected, projectID, "", prevProjectName, statusTick)
 	return nil
 }
 

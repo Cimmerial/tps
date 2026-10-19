@@ -14,11 +14,13 @@ const (
 	yellow       = "\033[33m"
 	magenta      = "\033[35m"
 	blue         = "\033[34m"
-	red          = "\033[31m"
-	boldBrightFG = "\033[1;93m"
+	red = "\033[31m"
 )
 
 func ColorEnabled() bool {
+	if current.ColorEnabled != nil {
+		return *current.ColorEnabled
+	}
 	return stdoutIsTTY()
 }
 
@@ -38,8 +40,8 @@ func Magenta(s string) string { return paint(magenta, s) }
 func Blue(s string) string    { return paint(blue, s) }
 func Red(s string) string { return paint(red, s) }
 
-// Abbrev highlights shortcut keys in menus and hints.
-func Abbrev(s string) string { return paint(boldBrightFG, s) }
+// Abbrev highlights shortcut keys in menus and hints (bright accent).
+func Abbrev(s string) string { return paint(abbrevCode(), s) }
 
 func Prompt() string {
 	return PromptBusy(0, 0)
@@ -55,10 +57,11 @@ func BrailleFrame(tick int) string {
 }
 
 func PromptBusy(running int, tick int) string {
+	prompt := paint(accentCode(), "> ")
 	if running <= 0 {
-		return Cyan("> ")
+		return prompt
 	}
-	return Dim(BrailleFrame(tick)+" ") + Cyan("> ")
+	return Dim(BrailleFrame(tick)+" ") + prompt
 }
 
 func TerminalsRunningLine(count int, tick int) string {
@@ -72,7 +75,7 @@ func Logo(s string) string {
 	if !ColorEnabled() {
 		return s
 	}
-	return Cyan(s)
+	return paint(titleCardColorCode(), s)
 }
 
 func ColorizeLines(s, lineColor string) string {
