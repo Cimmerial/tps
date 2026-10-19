@@ -10,6 +10,28 @@ import (
 	"github.com/Cimmerial/tps/internal/ui"
 )
 
+func parseTkInput(fields []string) (MenuInput, error) {
+	in := MenuInput{Action: ActionTerminalCheck, TcKillAll: true}
+	for i := 1; i < len(fields); i++ {
+		switch strings.ToLower(fields[i]) {
+		case "-a", "--all", "-all":
+			in.TcKillAllProjects = true
+		default:
+			return MenuInput{}, fmt.Errorf("tk: unknown flag %q", fields[i])
+		}
+	}
+	return in, nil
+}
+
+func isTcKillAllProjectsFlag(s string) bool {
+	switch strings.ToLower(s) {
+	case "-a", "--all", "-all":
+		return true
+	default:
+		return false
+	}
+}
+
 func parseTerminalCheck(fields []string) (MenuInput, error) {
 	start := 0
 	if len(fields) >= 2 && strings.EqualFold(fields[0], "terminal") && strings.EqualFold(fields[1], "check") {
@@ -31,6 +53,10 @@ func parseTerminalCheck(fields []string) (MenuInput, error) {
 			case strings.EqualFold(fields[i+1], "all"):
 				in.TcKillAll = true
 				i++
+			case isTcKillAllProjectsFlag(fields[i+1]):
+				in.TcKillAll = true
+				in.TcKillAllProjects = true
+				i++
 			default:
 				id, err := parseTcKillID(fields[i+1])
 				if err != nil {
@@ -39,6 +65,8 @@ func parseTerminalCheck(fields []string) (MenuInput, error) {
 				in.TcKillID = id
 				i++
 			}
+		case "-a", "--all", "-all":
+			in.TcKillAllProjects = true
 		case "-r", "--r", "-restart", "--restart":
 			in.TcRestart = true
 		default:
@@ -67,21 +95,21 @@ func printTerminalJobs(projectID string) error {
 		return err
 	}
 	if len(list) == 0 {
-		fmt.Println(ui.Dim("no terminals running (tk · t -k 1)"))
+		fmt.Println(ui.Dim("no terminals running (tk · tk -a · t -k 1)"))
 		return nil
 	}
 	fmt.Println(ui.Header("TERMINALS:"))
-	for _, j := range list {
+	for i, j := range list {
 		age := time.Since(j.Started).Round(time.Second)
 		fmt.Printf("  %d) %s  pid %d  %s  %s\n",
-			j.ID,
+			i+1,
 			ui.Abbrev(j.Alias),
 			j.PID,
 			ui.Dim(age.String()),
 			ui.Dim(truncateRunes(j.Shell, 40)),
 		)
 	}
-	fmt.Println(ui.Dim("tk · t -k 1 · tr"))
+	fmt.Println(ui.Dim("tk · tk -a · t -k 1 · tr"))
 	return nil
 }
 
@@ -103,9 +131,21 @@ func runTerminalCheck(p *config.Project, in MenuInput) error {
 	}
 	if in.TcKillAll {
 		var n int
-		if err := runWithBraille("stopping terminals…", func() error {
+		label := "stopping terminals…"
+		if in.TcKillAllProjects {
+			label = "stopping all tps terminals…"
+		}
+		if err := runWithBraille(label, func() error {
 			var kerr error
-			n, kerr = jobs.KillAll(p.ID)
+			if in.TcKillAllProjects {
+				cfg, err := config.Load()
+				if err != nil {
+					return err
+				}
+				n, kerr = jobs.KillAllRegistered(cfg)
+			} else {
+				n, kerr = jobs.KillAll(p.ID)
+			}
 			return kerr
 		}); err != nil {
 			return err

@@ -6,6 +6,54 @@ import (
 	"github.com/Cimmerial/tps/internal/config"
 )
 
+func TestResolveMenuInputClearVsTps(t *testing.T) {
+	in, err := resolveMenuInput(nil, &config.Project{}, "clear")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in.Action != ActionClear || !in.ClearScrollback {
+		t.Fatalf("clear: %+v", in)
+	}
+	in, err = resolveMenuInput(nil, &config.Project{}, "tps")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in.Action != ActionClear || in.ClearScrollback {
+		t.Fatalf("tps: %+v", in)
+	}
+}
+
+func TestResolveMenuInputViteBuiltin(t *testing.T) {
+	in, err := resolveMenuInput(nil, &config.Project{}, "vite")
+	if err != nil || in.Action != ActionCloseAllTerms {
+		t.Fatalf("vite: %+v err=%v", in, err)
+	}
+}
+
+func TestResolveMenuInputProjectByIndex(t *testing.T) {
+	cfg := &config.Config{
+		Projects: []config.Project{
+			{ID: "a", Name: "alpha", Path: "/a"},
+			{ID: "b", Name: "beta", Path: "/b"},
+		},
+	}
+	in, err := resolveMenuInput(cfg, &config.Project{}, "p1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in.Action != ActionSwitchProject || in.Text != "a" {
+		t.Fatalf("p1: %+v", in)
+	}
+	in, err = resolveMenuInput(cfg, &config.Project{}, "P2")
+	if err != nil || in.Text != "b" {
+		t.Fatalf("P2: %+v err=%v", in, err)
+	}
+	_, err = resolveMenuInput(cfg, &config.Project{}, "p9")
+	if err == nil {
+		t.Fatal("expected error for out of range project")
+	}
+}
+
 func TestResolveMenuInputCommandWithShellInputs(t *testing.T) {
 	p := &config.Project{
 		Commands: []config.Command{

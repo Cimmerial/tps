@@ -4,14 +4,19 @@ import (
 	"bufio"
 	"fmt"
 
+	"github.com/Cimmerial/tps/internal/jobs"
 	"github.com/Cimmerial/tps/internal/ui"
 )
 
-func readLine(_ *bufio.Reader, running int, tick int, padBefore bool) (string, error) {
+func readLine(_ *bufio.Reader, projectID string, tick int, padBefore bool) (string, error) {
+	drainDetachedCompleteNotices()
 	if padBefore {
 		fmt.Print("\r\033[K\n")
 	}
-	line, err := ui.ReadEditedLine(ui.PromptBusy(running, tick))
+	line, err := ui.ReadEditedLineFunc(func() string {
+		active, _ := jobs.Reap(projectID)
+		return ui.PromptBusy(len(active), tick)
+	})
 	if err != nil {
 		return "", err
 	}

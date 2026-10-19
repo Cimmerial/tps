@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Cimmerial/tps/internal/config"
+	"github.com/Cimmerial/tps/internal/instance"
 	"github.com/Cimmerial/tps/internal/project"
 	"github.com/Cimmerial/tps/internal/ui"
 	"github.com/Cimmerial/tps/internal/update"
@@ -53,6 +54,11 @@ func runSetup(nameOverride, pathOverride string) error {
 	if existing := cfg.FindByPath(root); existing != nil && nameOverride == "" && pathOverride == "" {
 		fmt.Println(ui.Yellow(fmt.Sprintf("%q is already set up at %s", existing.Name, existing.Path)))
 		fmt.Println(ui.Dim("add commands in config.yaml, nc, or export/import · run ih for install help"))
+		if tpsRepo := instance.DevRepoRoot(cfg); tpsRepo != "" {
+			if _, err := instance.SyncProject(tpsRepo, existing.Path); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 
@@ -109,6 +115,14 @@ func linkProjectAt(cfg *config.Config, linkDir, name string) (*config.Project, e
 	}
 	if err := config.Save(cfg); err != nil {
 		return nil, err
+	}
+	if err := ensureDevProjectCommands(cfg, linked); err != nil {
+		return linked, err
+	}
+	if tpsRepo := instance.DevRepoRoot(cfg); tpsRepo != "" {
+		if _, err := instance.SyncProject(tpsRepo, linked.Path); err != nil {
+			return linked, err
+		}
 	}
 	return linked, nil
 }

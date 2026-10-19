@@ -12,8 +12,12 @@ import (
 
 // executeProjectCommand runs precursors (in order) then the requested alias.
 // Foreground steps share one shell so export/source in a precursor applies to later steps.
+// Precursors before a detached step are prepended to the detached run script instead.
 // compactNextPrompt is true when capture output was printed (no extra blank line before prompt).
 func executeProjectCommand(p *config.Project, alias string, inputs []string) (int, bool, error) {
+	if handled, code, err := runDevBuiltin(p, alias, inputs); handled {
+		return code, false, err
+	}
 	chain, err := p.CommandRunChain(alias)
 	if err != nil {
 		return 1, false, err
@@ -38,20 +42,26 @@ func executeProjectCommand(p *config.Project, alias string, inputs []string) (in
 			fmt.Println(ui.Dim("precursor: " + a))
 		}
 		if runner.ShouldDetach(*cmd) {
-			code, err := runForegroundChain(p, fg)
-			fg = nil
-			if err != nil {
-				return code, compactNextPrompt, err
-			}
-			if code != 0 {
-				return code, compactNextPrompt, nil
+			if len(fg) > 0 {
+				for i := range shells {
+					shells[i] = joinDetachedShellPrecursors(fg, shells[i])
+				}
+				fg = nil
 			}
 			started, err := jobs.StartAllWithShells(p, a, shells)
 			if err != nil {
 				return 1, compactNextPrompt, err
 			}
 			for _, job := range started {
-				fmt.Println(ui.Green(fmt.Sprintf("started #%d in new terminal (%s)", job.ID, job.Alias)))
+				list, _ := jobs.Reap(p.ID)
+				n := jobs.ListDisplayNumber(list, job.ID)
+				if n == 0 {
+					n = len(list)
+				}
+				fmt.Println(ui.Green(fmt.Sprintf("started #%d in new terminal (%s)", n, job.Alias)))
+				if cmd.CloseOnComplete {
+					compactNextPrompt = true
+				}
 				if watchCaptureIfNeeded(p, job) {
 					compactNextPrompt = true
 				}
@@ -62,6 +72,13 @@ func executeProjectCommand(p *config.Project, alias string, inputs []string) (in
 	}
 	code, err := runForegroundChain(p, fg)
 	return code, compactNextPrompt, err
+}
+
+func joinDetachedShellPrecursors(precursors []string, shell string) string {
+	if len(precursors) == 0 {
+		return shell
+	}
+	return strings.Join(precursors, " && ") + " && " + shell
 }
 
 func runForegroundChain(p *config.Project, parts []string) (int, error) {

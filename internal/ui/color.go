@@ -52,13 +52,11 @@ func Prompt() string {
 	return PromptBusy(0, 0)
 }
 
-var braillePromptFrames = []string{"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
-
 func BrailleFrame(tick int) string {
-	if len(braillePromptFrames) == 0 {
+	if len(BrailleSpinnerFrames) == 0 {
 		return "⣾"
 	}
-	return braillePromptFrames[tick%len(braillePromptFrames)]
+	return BrailleSpinnerFrames[tick%len(BrailleSpinnerFrames)]
 }
 
 func PromptBusy(running int, tick int) string {

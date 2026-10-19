@@ -74,6 +74,9 @@ func runInteractive() error {
 	if err != nil {
 		return err
 	}
+	if err := ensureDevProjectCommands(cfg, selected); err != nil {
+		return err
+	}
 	if restartBanner == "" {
 		if root := devRepoRoot(cfg, selected); root != "" {
 			spin := ui.NewSpinner("checking for updates")
@@ -88,16 +91,17 @@ func runInteractive() error {
 	if len(selected.Commands) == 0 {
 		fmt.Println(ui.Dim("no project commands — tps project cmd add <alias> <shell>"))
 	}
+	initDetachedCompleteNotices()
+
 	statusTick := 0
 	ui.ClearScreen()
 	ui.PrintLogo()
 	printSessionHeader(selected, projectID, restartBanner, "", statusTick)
 
 	gapBeforePrompt := false
-	displayPrevProject := ""
 	for {
 		active, _ := jobs.Reap(projectID)
-		line, err := readLine(reader, len(active), statusTick, gapBeforePrompt)
+		line, err := readLine(reader, projectID, statusTick, gapBeforePrompt)
 		gapBeforePrompt = false
 		if len(active) > 0 {
 			statusTick++
@@ -142,7 +146,7 @@ func runInteractive() error {
 		case ActionClear:
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
-			if err := refreshInteractiveSession(projectID, statusTick, displayPrevProject); err != nil {
+			if err := refreshInteractiveSession(projectID, statusTick, "", input.ClearScrollback); err != nil {
 				return err
 			}
 		case ActionConfig:
@@ -189,12 +193,12 @@ func runInteractive() error {
 				continue
 			}
 			if newID != "" {
-				displayPrevProject = selected.Name
+				prevProjectName := selected.Name
 				projectID = newID
 				if err := config.SaveSessionProjectID(projectID); err != nil {
 					return err
 				}
-				if err := refreshInteractiveSession(projectID, statusTick, displayPrevProject); err != nil {
+				if err := refreshInteractiveSession(projectID, statusTick, prevProjectName, false); err != nil {
 					return err
 				}
 			}
@@ -226,6 +230,15 @@ func runInteractive() error {
 			config.Save(cfg)
 			if err := runTerminalCheck(selected, input); err != nil {
 				fmt.Fprintf(os.Stderr, "t: %v\n", err)
+			}
+		case ActionCloseAllTerms:
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
+			result, err := runCloseAllTerms()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "vite: %v\n", err)
+			} else {
+				printCloseAllTermsDone(result)
 			}
 		case ActionExport:
 			recordMetaUse(cfg, selected, input.Action)
@@ -287,8 +300,12 @@ func runInteractive() error {
 	}
 }
 
-func refreshInteractiveSession(projectID string, statusTick int, prevProjectName string) error {
-	ui.ClearScreen()
+func refreshInteractiveSession(projectID string, statusTick int, prevProjectName string, clearScrollback bool) error {
+	if clearScrollback {
+		ui.ClearTerminal()
+	} else {
+		ui.ClearScreen()
+	}
 	ui.PrintLogo()
 	_, selected, err := loadProject(projectID)
 	if err != nil {

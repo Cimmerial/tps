@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Cimmerial/tps/internal/config"
+	"github.com/Cimmerial/tps/internal/instance"
 	"github.com/Cimmerial/tps/internal/runner"
 	"github.com/Cimmerial/tps/internal/ui"
 )
@@ -16,8 +17,9 @@ type commandSnap struct {
 	Description string
 	Precursor   string
 	Capture     string
-	Detach      bool
-	Tags        []string
+	Detach          bool
+	CloseOnComplete bool
+	Tags            []string
 }
 
 func snapCommand(c config.Command) commandSnap {
@@ -27,8 +29,9 @@ func snapCommand(c config.Command) commandSnap {
 		Description: c.Description,
 		Precursor:   c.Precursor,
 		Capture:     c.Capture,
-		Detach:      c.Detach,
-		Tags:        append([]string(nil), c.Tags...),
+		Detach:          c.Detach,
+		CloseOnComplete: c.CloseOnComplete,
+		Tags:            append([]string(nil), c.Tags...),
 	}
 }
 
@@ -63,6 +66,7 @@ func snapsEqual(a, b commandSnap) bool {
 		a.Precursor == b.Precursor &&
 		a.Capture == b.Capture &&
 		a.Detach == b.Detach &&
+		a.CloseOnComplete == b.CloseOnComplete &&
 		sameTagSlice(a.Tags, b.Tags)
 }
 
@@ -85,6 +89,9 @@ func editCommandSnapDiffs(label string, b, a commandSnap) []string {
 	}
 	if a.Detach != b.Detach {
 		lines = append(lines, formatPrefChange(label+" detach", boolLabel(b.Detach), boolLabel(a.Detach)))
+	}
+	if a.CloseOnComplete != b.CloseOnComplete {
+		lines = append(lines, formatPrefChange(label+" close on complete", boolLabel(b.CloseOnComplete), boolLabel(a.CloseOnComplete)))
 	}
 	if !sameTagSlice(a.Tags, b.Tags) {
 		lines = append(lines, formatPrefChange(label+" tags", tagsLabel(b.Tags), tagsLabel(a.Tags)))
@@ -151,7 +158,7 @@ func editSessionChanges(before, after map[string]commandSnap) []string {
 
 func emptyDash(s string) string {
 	if strings.TrimSpace(s) == "" {
-		return "—"
+		return ui.SymbolEmDash
 	}
 	return s
 }
@@ -165,7 +172,7 @@ func boolLabel(v bool) string {
 
 func tagsLabel(tags []string) string {
 	if len(tags) == 0 {
-		return "—"
+		return ui.SymbolEmDash
 	}
 	return strings.Join(tags, ", ")
 }
@@ -179,7 +186,7 @@ func finishEditSession(projectID string, statusTick int, start map[string]comman
 	if err != nil {
 		return err
 	}
-	if err := refreshInteractiveSession(projectID, statusTick, ""); err != nil {
+	if err := refreshInteractiveSession(projectID, statusTick, "", false); err != nil {
 		return err
 	}
 	changes := editSessionChanges(start, end)
@@ -197,7 +204,12 @@ func finishEditSession(projectID string, statusTick int, start map[string]comman
 func editCommandList(p *config.Project) []config.Command {
 	var list []config.Command
 	for _, g := range p.CommandsByTag() {
-		list = append(list, g.Commands...)
+		for _, c := range g.Commands {
+			if instance.IsNonEditableDevProjectCommand(p, c.Alias) {
+				continue
+			}
+			list = append(list, c)
+		}
 	}
 	return list
 }
@@ -341,6 +353,14 @@ func editCommandSubmenu(reader *bufio.Reader, projectID, alias string) error {
 			return fmt.Errorf("no command %q", alias)
 		}
 		alias = cmd.Alias
+		if instance.IsNonEditableDevProjectCommand(p, alias) {
+			fmt.Println()
+			fmt.Printf("%s\n", ui.Header("edit"))
+			fmt.Println()
+			fmt.Println(ui.Dim("that command is built into tps and cannot be edited here"))
+			fmt.Println()
+			return nil
+		}
 
 		fmt.Println()
 		fmt.Printf("%s\n", ui.Header("edit"))
@@ -361,12 +381,12 @@ func editCommandSubmenu(reader *bufio.Reader, projectID, alias string) error {
 		if back {
 			return nil
 		}
-		switch choice {
-		case 1:
+		switch editCommandSubmenuAction(*cmd, choice) {
+		case editCmdMenuShell:
 			if err := editShellSubmenu(reader, projectID, alias); err != nil {
 				return err
 			}
-		case 2:
+		case editCmdMenuName:
 			newAlias, err := editPromptName(reader, projectID, alias, cmd)
 			if err != nil {
 				return err
@@ -374,31 +394,35 @@ func editCommandSubmenu(reader *bufio.Reader, projectID, alias string) error {
 			if newAlias != "" {
 				alias = newAlias
 			}
-		case 3:
+		case editCmdMenuAbbrev:
 			if err := editPromptAbbrev(reader, projectID, alias, cmd); err != nil {
 				return err
 			}
-		case 4:
+		case editCmdMenuDescription:
 			if err := editPromptDescription(reader, projectID, alias, cmd); err != nil {
 				return err
 			}
-		case 5:
+		case editCmdMenuTags:
 			if err := editPromptTags(reader, projectID, alias, cmd); err != nil {
 				return err
 			}
-		case 6:
+		case editCmdMenuPrecursor:
 			if err := editPromptPrecursor(reader, projectID, alias, cmd); err != nil {
 				return err
 			}
-		case 7:
+		case editCmdMenuDetach:
 			if err := editToggleDetach(projectID, alias, cmd); err != nil {
 				return err
 			}
-		case 8:
+		case editCmdMenuCloseOnComplete:
+			if err := editToggleCloseOnComplete(projectID, alias, cmd); err != nil {
+				return err
+			}
+		case editCmdMenuCapture:
 			if err := editCaptureSubmenu(reader, projectID, alias); err != nil {
 				return err
 			}
-		case 9:
+		case editCmdMenuDelete:
 			confirmed, err := editConfirmDelete(reader, alias)
 			if err != nil {
 				return err
@@ -409,7 +433,7 @@ func editCommandSubmenu(reader *bufio.Reader, projectID, alias string) error {
 				}
 				return nil
 			}
-		default:
+		case editCmdMenuInvalid:
 			fmt.Println(ui.Dim("invalid choice"))
 		}
 	}
@@ -425,9 +449,9 @@ func editTruncateDisplay(s string, max int) string {
 
 func editFieldSetMark(set bool) string {
 	if set {
-		return ui.Green("✓")
+		return ui.Green(ui.SymbolCheck)
 	}
-	return ui.Red("✗")
+	return ui.Red(ui.SymbolCross)
 }
 
 func editDescriptionIsSet(cmd config.Command) bool {
@@ -446,6 +470,61 @@ func editShellHelpLine(cmd config.Command) string {
 	return editTruncateDisplay(fields[0].Value, 48) + fmt.Sprintf(" (+%d more)", len(fields)-1)
 }
 
+type editCmdMenuAction int
+
+const (
+	editCmdMenuInvalid         editCmdMenuAction = 0
+	editCmdMenuShell           editCmdMenuAction = 1
+	editCmdMenuName            editCmdMenuAction = 2
+	editCmdMenuAbbrev          editCmdMenuAction = 3
+	editCmdMenuDescription     editCmdMenuAction = 4
+	editCmdMenuTags            editCmdMenuAction = 5
+	editCmdMenuPrecursor       editCmdMenuAction = 6
+	editCmdMenuDetach          editCmdMenuAction = 7
+	editCmdMenuCloseOnComplete editCmdMenuAction = 8
+	editCmdMenuCapture         editCmdMenuAction = 9
+	editCmdMenuDelete          editCmdMenuAction = 10
+)
+
+func editCommandShowsCloseOnComplete(cmd config.Command) bool {
+	return runner.ShouldDetach(cmd)
+}
+
+func editCommandSubmenuActions(cmd config.Command) []editCmdMenuAction {
+	items := []editCmdMenuAction{
+		editCmdMenuShell,
+		editCmdMenuName,
+		editCmdMenuAbbrev,
+		editCmdMenuDescription,
+		editCmdMenuTags,
+		editCmdMenuPrecursor,
+		editCmdMenuDetach,
+	}
+	if editCommandShowsCloseOnComplete(cmd) {
+		items = append(items, editCmdMenuCloseOnComplete)
+	}
+	items = append(items, editCmdMenuCapture, editCmdMenuDelete)
+	return items
+}
+
+func editCommandSubmenuAction(cmd config.Command, choice int) editCmdMenuAction {
+	if choice < 1 {
+		return editCmdMenuInvalid
+	}
+	items := editCommandSubmenuActions(cmd)
+	if choice > len(items) {
+		return editCmdMenuInvalid
+	}
+	return items[choice-1]
+}
+
+func editCloseOnCompleteHelp(cmd config.Command) string {
+	if !cmd.CloseOnComplete {
+		return "leave terminal open when the command exits"
+	}
+	return "close terminal tab when the command exits"
+}
+
 func editCommandSubmenuRows(cmd config.Command) []numberedMenuRow {
 	shellSet := cmd.HasAnyShellLine()
 	nameSet := strings.TrimSpace(cmd.Alias) != ""
@@ -455,7 +534,7 @@ func editCommandSubmenuRows(cmd config.Command) []numberedMenuRow {
 	precSet := cmd.Precursor != ""
 	capSet := cmd.Capture != ""
 	detached, detachHelp := runner.DetachInfo(cmd)
-	return []numberedMenuRow{
+	rows := []numberedMenuRow{
 		{Num: "1", Status: editFieldSetMark(shellSet), Desc: ui.Dim("shell"), HelpLine: editHelpIf(shellSet, editShellHelpLine(cmd))},
 		{Num: "2", Status: editFieldSetMark(nameSet), Desc: ui.Dim("name"), HelpLine: editHelpIf(nameSet, cmd.Alias)},
 		{Num: "3", Status: editFieldSetMark(abbrevSet), Desc: ui.Dim("abbreviation"), HelpLine: editHelpIf(abbrevSet, cmd.Abbrev)},
@@ -463,9 +542,22 @@ func editCommandSubmenuRows(cmd config.Command) []numberedMenuRow {
 		{Num: "5", Status: editFieldSetMark(tagsSet), Desc: ui.Dim("tags"), HelpLine: editHelpIf(tagsSet, tagsLabel(cmd.Tags))},
 		{Num: "6", Status: editFieldSetMark(precSet), Desc: ui.Dim("precursor"), HelpLine: editHelpIf(precSet, cmd.Precursor)},
 		{Num: "7", Status: editFieldSetMark(detached), Desc: ui.Dim("detach / terminal"), HelpLine: detachHelp},
-		{Num: "8", Status: editFieldSetMark(capSet), Desc: ui.Dim("capture"), HelpLine: editHelpIf(capSet, cmd.Capture)},
-		{Num: "9", Desc: ui.Dim("delete command")},
 	}
+	if editCommandShowsCloseOnComplete(cmd) {
+		rows = append(rows, numberedMenuRow{
+			Num:      "8",
+			Status:   editFieldSetMark(cmd.CloseOnComplete),
+			Desc:     ui.Dim("kill detachment after completion"),
+			HelpLine: editCloseOnCompleteHelp(cmd),
+		})
+	}
+	capNum := len(rows) + 1
+	delNum := capNum + 1
+	rows = append(rows,
+		numberedMenuRow{Num: fmt.Sprint(capNum), Status: editFieldSetMark(capSet), Desc: ui.Dim("capture"), HelpLine: editHelpIf(capSet, cmd.Capture)},
+		numberedMenuRow{Num: fmt.Sprint(delNum), Desc: ui.Dim("delete command")},
+	)
+	return rows
 }
 
 func editHelpIf(set bool, val string) string {
@@ -506,10 +598,10 @@ func editMutateCommand(projectID, alias string, mutate func(*config.Command)) er
 func editPromptField(reader *bufio.Reader, field, current string, allowClear bool) (string, bool, error) {
 	fmt.Println()
 	cur := emptyDash(current)
-	if cur != "—" {
+	if cur != ui.SymbolEmDash {
 		fmt.Printf("current %s: %s\n", field, ui.Faint(cur))
 	} else {
-		fmt.Printf("current %s: %s\n", field, ui.Dim("—"))
+		fmt.Printf("current %s: %s\n", field, ui.Dim(ui.SymbolEmDash))
 	}
 	if allowClear {
 		fmt.Println(ui.Dim("Enter to keep · - to clear"))
@@ -641,6 +733,7 @@ func editToggleDetach(projectID, alias string, cmd *config.Command) error {
 		} else {
 			c.ForceForeground = true
 			c.Detach = false
+			c.CloseOnComplete = false
 		}
 	}); err != nil {
 		return err
@@ -652,9 +745,21 @@ func editToggleDetach(projectID, alias string, cmd *config.Command) error {
 	} else {
 		after.ForceForeground = true
 		after.Detach = false
+		after.CloseOnComplete = false
 	}
 	_, hint := runner.DetachInfo(after)
 	fmt.Println(ui.Dim(hint))
+	return nil
+}
+
+func editToggleCloseOnComplete(projectID, alias string, cmd *config.Command) error {
+	next := !cmd.CloseOnComplete
+	if err := editMutateCommand(projectID, alias, func(c *config.Command) {
+		c.CloseOnComplete = next
+	}); err != nil {
+		return err
+	}
+	fmt.Println(ui.Dim(editCloseOnCompleteHelp(config.Command{CloseOnComplete: next})))
 	return nil
 }
 
@@ -692,48 +797,29 @@ func editDeleteCommand(projectID, alias string) error {
 	return nil
 }
 
+func editNextDraftAlias(p *config.Project) string {
+	if p.FindCommand("new") == nil {
+		return "new"
+	}
+	for n := 2; ; n++ {
+		alias := fmt.Sprintf("new-%d", n)
+		if p.FindCommand(alias) == nil {
+			return alias
+		}
+	}
+}
+
 func editAddCommand(reader *bufio.Reader, cfg *config.Config, projectID string) error {
-	name, err := ui.ReadEditedLine("name (-n): ")
-	if err != nil {
-		return editPromptErr(err)
-	}
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return fmt.Errorf("name is required")
-	}
-	abbrev, err := ui.ReadEditedLine("abbrev (-a) [optional]: ")
-	if err != nil {
-		return editPromptErr(err)
-	}
-	shell, err := ui.ReadEditedLine("shell (-c): ")
-	if err != nil {
-		return editPromptErr(err)
-	}
-	shell = strings.TrimSpace(shell)
-	if shell == "" {
-		return fmt.Errorf("shell is required")
-	}
-	cmd := config.Command{
-		Alias:       name,
-		Abbrev:      strings.TrimSpace(abbrev),
-		Shell:       shell,
-		Description: name,
-	}
 	p := cfg.FindByID(projectID)
 	if p == nil {
 		return fmt.Errorf("project not found")
 	}
-	if resolveProjectCommand(p, name) != nil {
-		return fmt.Errorf("command %q already exists", name)
-	}
-	if err := p.AddCommand(cmd); err != nil {
-		return err
-	}
+	alias := editNextDraftAlias(p)
+	p.Commands = append(p.Commands, config.Command{Alias: alias})
 	if err := config.Save(cfg); err != nil {
 		return err
 	}
-	fmt.Println(ui.Green(fmt.Sprintf("added %q", name)))
-	return nil
+	return editCommandSubmenu(reader, projectID, alias)
 }
 
 func editManageTags(reader *bufio.Reader, projectID string) error {

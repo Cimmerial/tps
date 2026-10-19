@@ -67,11 +67,13 @@ func launchShell(p *config.Project, alias, shell string, recordHistory bool) (Jo
 	if cmd == nil {
 		return Job{}, fmt.Errorf("unknown command %q", alias)
 	}
-	jobs, err := Reap(p.ID)
+	if _, err := Reap(p.ID); err != nil {
+		return Job{}, err
+	}
+	id, err := allocateJobID(p.ID)
 	if err != nil {
 		return Job{}, err
 	}
-	id := nextID(jobs)
 	pidPath, err := PIDFile(p.ID, id)
 	if err != nil {
 		return Job{}, err
@@ -97,6 +99,7 @@ func launchShell(p *config.Project, alias, shell string, recordHistory bool) (Jo
 		_ = os.Remove(logPath)
 	}
 
+	closeOnComplete := cmd != nil && cmd.CloseOnComplete
 	if err := spawnInTerminal(p.Path, shell, pidPath, logPath, ttyPath); err != nil {
 		return Job{}, err
 	}
@@ -138,6 +141,10 @@ func launchShell(p *config.Project, alias, shell string, recordHistory bool) (Jo
 		if err := appendHistory(p.ID, alias); err != nil {
 			return job, err
 		}
+	}
+	if closeOnComplete {
+		_ = spawnCloseWatcherScript(p.ID, job)
+		notifyDetachedComplete(p.ID, job)
 	}
 	return job, nil
 }

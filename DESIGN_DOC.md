@@ -34,7 +34,7 @@ TPS is a **personal project command hub**: one interactive CLI where linked repo
 
 ### Project commands
 
-Defined in config per project: `alias`, `shell`, `abbreviation`, optional `description`, `detach`, `capture`.
+Defined in config per project: `alias`, `shell`, `abbreviation`, optional `description`, `detach`, `close_on_complete` (with `detach: true`, close the terminal tab when the command exits), `capture`.
 
 | Interactive | Meaning |
 |-------------|---------|
@@ -45,7 +45,7 @@ Defined in config per project: `alias`, `shell`, `abbreviation`, optional `descr
 **Detached run (macOS Terminal.app):**
 
 - Opens a **background** Terminal tab/window (`open -g`), does not steal focus from Cursor/VS Code.
-- **`t`** list jobs · **`tk`** / **`t -k`** kill all · **`t -k N`** one job · **`tr`** / **`t -r`** kill all and replay **launch history** in order. (`tc` / `tck` / `tcr` still work.)
+- **`t`** list jobs · **`tk`** / **`t -k`** kill this project’s jobs · **`tk -a`** / **`tk -all`** kill every tps-tracked job · **`t -k N`** one job · **`tr`** / **`t -r`** kill all and replay **launch history** in order. (`tc` / `tck` / `tcr` still work.) **`vite`**: from any project on macOS, kill tab processes then close all Terminal.app windows (same strategy as `tk`).
 - Kill: process tree + optional **`--port`** cleanup; close tab by TTY or window title (`<project-id>-<n>.command`).
 - **`capture`:** tee log in run script, match preset (`trycloudflare` / `cf`) or regex → print URL + **clipboard**.
 
@@ -62,7 +62,8 @@ Defined in config per project: `alias`, `shell`, `abbreviation`, optional `descr
 | `export` / `export -a` | Export current project or all to YAML |
 | `import <file>` | Merge project(s) from export file |
 | `ih` / `ih -copy` | Install docs / clipboard script |
-| `tps` / `clear` | Refresh screen + menu |
+| `tps` | Clear visible screen and redraw menu at top (keeps scrollback) |
+| `clear` | Clear terminal scrollback + refresh (VS Code Cmd+K style) |
 | `q` | Quit |
 
 Startup **auto-update** (quiet `go install`) when a tps dev repo is in config, unless just restarted from `u`.
@@ -88,6 +89,16 @@ internal/git     → ship + passthrough
 internal/update  → install, fingerprint, restart flags, sync all binaries
 internal/ui      → logo, colors, spinner, clipboard, prompt
 ```
+
+---
+
+## Instance README (`TPS.md`)
+
+Each **linked app repo** gets `TPS.md` at its root: how tps works here, limitations, and common keys. The canonical source is **`instance/README.md` in this repo** (not the ASCII-art `README.md`).
+
+**When you change behavior, menus, detach/capture, or documented limits:** edit `instance/README.md`, then ship tps. Copies refresh when users run `tps setup`, link a project (`tps project add`), or update tps (`u` / auto-update after a rebuilt binary).
+
+Implementation: `internal/instance` copies `instance/README.md` → `<project>/TPS.md`.
 
 ---
 

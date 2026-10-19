@@ -28,9 +28,8 @@ func allBuiltInHints(p *config.Project) []hintEntry {
 		}},
 		{key: "quit", abbr: "q", label: "quit", order: 3, show: func(*config.Project) bool { return true }},
 		{key: "switch", abbr: "p", label: "project", order: 4, show: func(*config.Project) bool { return true }},
-		{key: "clear", abbr: "tps", label: "clear", order: 5, show: func(*config.Project) bool { return true }},
+		{key: "clear", abbr: "tps", label: "refresh", order: 5, show: func(*config.Project) bool { return true }},
 		{key: "new_command", abbr: "nc", label: "new cmd", order: 6, show: func(*config.Project) bool { return true }},
-		{key: "config", abbr: "c", label: "config", order: 7, show: func(*config.Project) bool { return true }},
 		{key: "options", abbr: "o", label: "options", order: 7, show: func(*config.Project) bool { return true }},
 		{key: "update", abbr: "u", label: "update", order: 7, show: func(p *config.Project) bool {
 			cfg, err := config.Load()
@@ -47,7 +46,7 @@ func allBuiltInHints(p *config.Project) []hintEntry {
 
 func isPinnedHintKey(key string) bool {
 	switch key {
-	case "help", "edit", "config", "clear":
+	case "help", "edit", "options", "clear":
 		return true
 	default:
 		return false
@@ -75,7 +74,7 @@ func builtInMainHints(p *config.Project) []hintEntry {
 
 func builtInPinnedHints(p *config.Project) []hintEntry {
 	var out []hintEntry
-	for _, key := range []string{"help", "edit", "config", "clear"} {
+	for _, key := range []string{"help", "edit", "options", "clear"} {
 		for _, h := range allBuiltInHints(p) {
 			if h.key == key && h.show(p) {
 				out = append(out, h)
@@ -160,6 +159,8 @@ func metaKeyForAction(action InputAction) string {
 		return "terminals"
 	case ActionOptions:
 		return "options"
+	case ActionCloseAllTerms:
+		return "close_all_terms"
 	default:
 		return ""
 	}

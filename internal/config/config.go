@@ -184,14 +184,14 @@ func (p *Project) AddCommand(cmd Command) error {
 	if cmd.Alias == "" {
 		return errors.New("command alias is required")
 	}
-	if cmd.Shell == "" {
-		return errors.New("command shell is required")
-	}
 	for i := range p.Commands {
 		if p.Commands[i].Alias == cmd.Alias {
 			p.Commands[i] = cmd
 			return nil
 		}
+	}
+	if cmd.Shell == "" && !cmd.HasAnyShellLine() && strings.TrimSpace(cmd.Handler) == "" {
+		return errors.New("command shell is required")
 	}
 	p.Commands = append(p.Commands, cmd)
 	return nil

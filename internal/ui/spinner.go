@@ -8,8 +8,6 @@ import (
 	"golang.org/x/term"
 )
 
-var brailleFrames = []string{"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
-
 type Spinner struct {
 	stop chan struct{}
 	done chan struct{}
@@ -33,7 +31,7 @@ func NewSpinner(label string) *Spinner {
 				close(s.done)
 				return
 			default:
-				frame := brailleFrames[i%len(brailleFrames)]
+				frame := BrailleSpinnerFrames[i%len(BrailleSpinnerFrames)]
 				fmt.Fprintf(os.Stderr, "\r%s %s", frame, label)
 				i++
 				time.Sleep(80 * time.Millisecond)

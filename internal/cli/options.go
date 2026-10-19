@@ -49,7 +49,7 @@ func optionsSessionChanges(before, after prefSnapshot) []string {
 		lines = append(lines, formatPrefChange("color", before.colorLabel, after.colorLabel))
 	}
 	if before.smsTo != after.smsTo {
-		lines = append(lines, formatPrefChange("sms_to", prefDisplay(before.smsTo), prefDisplay(after.smsTo)))
+		lines = append(lines, formatPrefChange("sms_to", smsToChangeDisplay(before.smsTo), smsToChangeDisplay(after.smsTo)))
 	}
 	if before.smsShortcut != after.smsShortcut {
 		lines = append(lines, formatPrefChange("sms_shortcut", prefDisplay(before.smsShortcut), prefDisplay(after.smsShortcut)))
@@ -69,7 +69,7 @@ func finishOptionsSession(projectID string, statusTick int, start prefSnapshot) 
 	if err != nil {
 		return err
 	}
-	if err := refreshInteractiveSession(projectID, statusTick, ""); err != nil {
+	if err := refreshInteractiveSession(projectID, statusTick, "", false); err != nil {
 		return err
 	}
 	changes := optionsSessionChanges(start, snapshotPreferences(endPrefs))

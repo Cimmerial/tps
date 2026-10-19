@@ -37,34 +37,13 @@ func spawnInTerminal(workDir, shellCmd, pidFile, logFile, ttyFile string) error 
 
 	runInv := "bash -l " + shSingleQuote(runScript)
 
-	closeHook := fmt.Sprintf(`
-tps_close_tab() {
-  local dev
-  if [[ -f %s ]]; then dev=$(cat %s); else dev=$(basename "$(tty 2>/dev/null)" 2>/dev/null); fi
-  [[ -z "$dev" ]] && return 0
-  osascript -e "tell application \"Terminal\"
-    set target to \"$dev\"
-    repeat with w in windows
-      repeat with t in tabs of w
-        try
-          set tt to tty of t
-          if tt is target or tt is (\"/dev/\" & target) then
-            close t saving no
-            return
-          end if
-        end try
-      end repeat
-    end repeat
-  end tell" 2>/dev/null || true
-}
-trap tps_close_tab EXIT
-dev=$(basename "$(tty 2>/dev/null)" 2>/dev/null)
-echo "$dev" > %s
-`, shSingleQuote(ttyFile), shSingleQuote(ttyFile), shSingleQuote(ttyFile))
-
+	recordTTY := fmt.Sprintf(
+		"dev=$(basename \"$(tty 2>/dev/null)\" 2>/dev/null | tr -d '[:space:]')\nprintf '%%s' \"$dev\" > %s\n",
+		shSingleQuote(ttyFile),
+	)
 	body := fmt.Sprintf(
 		"#!/usr/bin/env bash\n%s\nset -m\n%s &\nchild=$!\necho $child > %s\npgid=$(ps -o pgid= -p $child 2>/dev/null | tr -d ' ')\necho \"$pgid\" > %s\nwait $child\n",
-		closeHook,
+		recordTTY,
 		runInv,
 		shSingleQuote(pidFile),
 		shSingleQuote(pgidFile),

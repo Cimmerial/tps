@@ -20,10 +20,12 @@ func (c *Command) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	}
 	c.Detach = boolField(raw, "detach")
 	c.ForceForeground = boolField(raw, "foreground")
+	c.CloseOnComplete = boolField(raw, "close_on_complete")
 	c.Capture = stringField(raw, "capture")
 	c.CaptureActions = ParseCaptureActions(raw["capture_actions"])
 	c.Tags = parseTagsField(raw["tags"])
 	c.Precursor = stringField(raw, "precursor")
+	c.Handler = stringField(raw, "handler")
 
 	st := parseShellStore(raw)
 	if len(st.generic) > 0 || len(st.windows) > 0 || len(st.linux) > 0 || len(st.darwin) > 0 {
@@ -55,6 +57,9 @@ func (c Command) MarshalYAML() (interface{}, error) {
 	if c.ForceForeground {
 		out["foreground"] = true
 	}
+	if c.CloseOnComplete {
+		out["close_on_complete"] = true
+	}
 	if c.Capture != "" {
 		out["capture"] = c.Capture
 	}
@@ -66,6 +71,9 @@ func (c Command) MarshalYAML() (interface{}, error) {
 	}
 	if strings.TrimSpace(c.Precursor) != "" {
 		out["precursor"] = strings.TrimSpace(c.Precursor)
+	}
+	if strings.TrimSpace(c.Handler) != "" {
+		out["handler"] = strings.TrimSpace(c.Handler)
 	}
 	if c.shells != nil {
 		for k, v := range c.shells.marshalFields() {

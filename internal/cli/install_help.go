@@ -136,10 +136,9 @@ func printInstallHelp() {
 
 	fmt.Println()
 	fmt.Println(ui.Bold("Update the tps binary"))
-	fmt.Println(ui.Dim("  inside the tps dev repo (interactive):"))
+	fmt.Println(ui.Dim("  git pull linked tps repo, rebuild, sync every tps on this machine:"))
 	fmt.Printf("    %s\n", ui.Cyan("u"))
-	fmt.Println(ui.Dim("  sync every tps binary on PATH plus ./tps in this repo:"))
-	fmt.Printf("    %s\n", ui.Cyan("u -a"))
+	fmt.Println(ui.Dim("  (u -a is the same)"))
 	fmt.Println(ui.Dim("  copy paste-safe install commands (run ih -copy from your app repo):"))
 	fmt.Printf("    %s\n", ui.Cyan("ih -copy"))
 	fmt.Println(ui.Dim("  or from the repo root:"))

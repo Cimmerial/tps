@@ -1,10 +1,13 @@
 package cli
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/Cimmerial/tps/internal/config"
+	"github.com/Cimmerial/tps/internal/ui"
 )
 
 func TestEditSessionChangesRename(t *testing.T) {
@@ -35,6 +38,26 @@ func TestEditSessionChanges(t *testing.T) {
 	same := editSessionChanges(before, before)
 	if len(same) != 0 {
 		t.Fatalf("expected no changes, got %v", same)
+	}
+}
+
+func TestEditCommandListSkipsNonEditableDevCommands(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "cmd", "tps"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	p := &config.Project{
+		Path: root,
+		Commands: []config.Command{
+			{Alias: "run", Shell: "go test ./..."},
+			{Alias: "sym", Handler: "sym"},
+			{Alias: "update", Shell: "go install ./cmd/tps"},
+			{Alias: "close all terms", Abbrev: "vite", Shell: "osascript"},
+		},
+	}
+	list := editCommandList(p)
+	if len(list) != 1 || list[0].Alias != "run" {
+		t.Fatalf("edit list = %+v", list)
 	}
 }
 
@@ -70,14 +93,41 @@ func TestEditCommandSubmenuRowsStatus(t *testing.T) {
 		Detach:      true,
 	}
 	rows := editCommandSubmenuRows(cmd)
-	if len(rows) != 9 {
+	if len(rows) != 10 {
 		t.Fatalf("len=%d", len(rows))
+	}
+	if rows[7].Desc != ui.Dim("kill detachment after completion") {
+		t.Fatalf("row 8 = %q", rows[7].Desc)
 	}
 	if rows[0].HelpLine == "" {
 		t.Fatal("expected shell help")
 	}
 	if rows[6].HelpLine == "" {
 		t.Fatal("expected detach help")
+	}
+}
+
+func TestEditCommandSubmenuRowsNoCloseWhenForeground(t *testing.T) {
+	cmd := config.Command{Alias: "x", Shell: "echo hi", Detach: false}
+	rows := editCommandSubmenuRows(cmd)
+	if len(rows) != 9 {
+		t.Fatalf("len=%d", len(rows))
+	}
+	for _, r := range rows {
+		if r.Desc == ui.Dim("kill detachment after completion") {
+			t.Fatal("close-on-complete row should be hidden when not detached")
+		}
+	}
+}
+
+func TestEditNextDraftAlias(t *testing.T) {
+	p := &config.Project{}
+	if editNextDraftAlias(p) != "new" {
+		t.Fatalf("expected new")
+	}
+	p.Commands = []config.Command{{Alias: "new", Shell: "x"}}
+	if editNextDraftAlias(p) != "new-2" {
+		t.Fatalf("expected new-2")
 	}
 }
 

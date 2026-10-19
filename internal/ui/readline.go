@@ -13,28 +13,42 @@ import (
 
 // ReadEditedLine prints prompt and reads a line with basic editing (arrows, backspace, delete).
 func ReadEditedLine(prompt string) (string, error) {
+	return ReadEditedLineFunc(func() string { return prompt })
+}
+
+// ReadEditedLineFunc is like ReadEditedLine but re-evaluates the prompt on each redraw (e.g. terminal count).
+func ReadEditedLineFunc(promptFn func() string) (string, error) {
 	if !stdinIsTTY() {
-		return readLineFallback(prompt)
+		return readLineFallback(promptFn())
 	}
 	fd := int(os.Stdin.Fd())
 	old, err := term.MakeRaw(fd)
 	if err != nil {
-		return readLineFallback(prompt)
+		return readLineFallback(promptFn())
 	}
 	defer term.Restore(fd, old)
 
-	fmt.Print("\r\033[K" + prompt)
+	fmt.Print("\r\033[K" + promptFn())
 	buf := []rune{}
 	pos := 0
 	in := bufio.NewReader(os.Stdin)
 
 	redraw := func() {
-		fmt.Print("\r\033[K" + prompt + string(buf))
+		fmt.Print("\r\033[K" + promptFn() + string(buf))
 		tail := len(buf) - pos
 		if tail > 0 {
 			fmt.Printf("\033[%dD", tail)
 		}
 	}
+
+	endNotices := BeginPromptNotices(func(lines ...string) {
+		fmt.Print("\r\033[K")
+		for _, line := range lines {
+			fmt.Println(line)
+		}
+		redraw()
+	})
+	defer endNotices()
 
 	for {
 		b, err := in.ReadByte()

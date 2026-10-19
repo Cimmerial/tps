@@ -21,10 +21,12 @@ type Command struct {
 	Description string `yaml:"description,omitempty"`
 	Detach          bool `yaml:"detach,omitempty"`
 	ForceForeground bool `yaml:"foreground,omitempty"` // skip auto-detach heuristics
+	CloseOnComplete bool `yaml:"close_on_complete,omitempty"` // close detached terminal tab when the shell command exits
 	Capture        string   `yaml:"capture,omitempty"`         // regex or preset (url, trycloudflare, …)
 	CaptureActions []string `yaml:"capture_actions,omitempty"` // print, clipboard, sms
 	Tags        []string `yaml:"tags,omitempty"`    // first tag = menu folder (e.g. admin, git)
 	Precursor   string   `yaml:"precursor,omitempty"` // alias or abbrev of command to run first
+	Handler     string   `yaml:"handler,omitempty"`   // in-process builtin id (no shell)
 
 	shells *shellStore `yaml:"-"`
 }

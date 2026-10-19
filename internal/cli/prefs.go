@@ -20,5 +20,5 @@ func applyUIPreferences() error {
 }
 
 func refreshUISession(projectID string, statusTick int) error {
-	return refreshInteractiveSession(projectID, statusTick, "")
+	return refreshInteractiveSession(projectID, statusTick, "", false)
 }

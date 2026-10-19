@@ -34,6 +34,7 @@ const (
 	ActionSetup
 	ActionConfigExamples
 	ActionOptions
+	ActionCloseAllTerms
 )
 
 type MenuInput struct {
@@ -47,9 +48,11 @@ type MenuInput struct {
 	SetupName   string
 	SetupPath   string
 	NewCmd      config.Command
-	TcKillAll   bool
-	TcKillID    int
-	TcRestart   bool
+	TcKillAll         bool
+	TcKillAllProjects bool
+	TcKillID          int
+	TcRestart         bool
+	ClearScrollback   bool
 }
 
 func truncateRunes(s string, max int) string {
@@ -63,12 +66,12 @@ func truncateRunes(s string, max int) string {
 }
 
 func formatSessionProjectLine(currentName, prevName string) string {
-	current := ui.Bold(ui.Magenta(strings.TrimSpace(currentName)))
+	current := ui.Bold(ui.Yellow(strings.TrimSpace(currentName)))
 	prevName = strings.TrimSpace(prevName)
 	if prevName == "" {
 		return current
 	}
-	prev := ui.Bold(ui.Magenta(prevName))
+	prev := ui.Dim(ui.Bold(ui.Yellow(prevName)))
 	return prev + ui.Dim(" -> ") + current
 }
 
@@ -108,10 +111,12 @@ func printFullHelp(p *config.Project) {
 		{
 			title: "session",
 			rows: []helpRow{
-				cmdRow("clear", "tps", "reset screen and menu"),
+				cmdRow("clear", "", "clear terminal scrollback"),
+				cmdRow("tps", "tps", "refresh logo and menu at top of screen"),
 				cmdRow("quit", "q", "exit tps"),
-				cmdRow("project", "p", "switch linked project"),
+				cmdRow("project", "p · p1", "switch linked project (p1, p2, … or p name)"),
 				cmdRow("options", "o", "logo/color, terminal colors, capture sms"),
+				cmdRow("close all terms", "vite", "macOS: kill tab processes and close every Terminal.app window"),
 			},
 		},
 		{
@@ -120,7 +125,7 @@ func printFullHelp(p *config.Project) {
 				cmdRow("config", "c", "open config.yaml in Cursor/VS Code or $EDITOR"),
 				cmdRow("edit", "e", "edit commands, tags, shells (e hello)"),
 				cmdRow("new command", "nc", "nc -n name -a abbrev -c shell (-tags admin,git -t terminal, -m capture); run: ic -user"),
-				cmdRow("terminals", "t", "t · tk · t -k 1 · tr"),
+				cmdRow("terminals", "t", "t · tk · tk -a · vite · t -k 1 · tr"),
 				cmdRow("export", "export", "export project YAML (export -a for all)"),
 				cmdRow("import", "import", "import path/to/file.tps.yaml"),
 				cmdRow("config examples", "ce", "YAML & nc examples for new commands"),
@@ -137,8 +142,8 @@ func printFullHelp(p *config.Project) {
 		sections = append(sections, helpSection{
 			title: "update",
 			rows: []helpRow{
-				cmdRow("update", "u", "go install ./cmd/tps and restart tps"),
-				cmdRow("update all", "u -a", "install and copy to every tps on PATH and ./tps"),
+				cmdRow("update", "u", "git pull tps repo, rebuild, sync every tps on this machine"),
+				cmdRow("update all", "u -a", "same as u (git pull, rebuild, sync all binaries)"),
 			},
 		})
 	}
@@ -382,7 +387,9 @@ func resolveMenuInput(cfg *config.Config, p *config.Project, line string) (MenuI
 	switch low {
 	case "h", "help", "?":
 		return MenuInput{Action: ActionHelp}, nil
-	case "clear", "tps":
+	case "clear":
+		return MenuInput{Action: ActionClear, ClearScrollback: true}, nil
+	case "tps":
 		return MenuInput{Action: ActionClear}, nil
 	case "c", "config", "yaml":
 		return MenuInput{Action: ActionConfig}, nil
@@ -390,11 +397,24 @@ func resolveMenuInput(cfg *config.Config, p *config.Project, line string) (MenuI
 		return MenuInput{Action: ActionSwitchProject}, nil
 	case "o", "options":
 		return MenuInput{Action: ActionOptions}, nil
+	case "vite", "close all terms":
+		return MenuInput{Action: ActionCloseAllTerms}, nil
 	}
 
 	if strings.HasPrefix(low, "p ") {
 		name := strings.TrimSpace(line[2:])
 		return MenuInput{Action: ActionSwitchProject, Text: name}, nil
+	}
+	if len(low) > 1 && low[0] == 'p' {
+		if n, err := strconv.Atoi(low[1:]); err == nil {
+			if cfg == nil || len(cfg.Projects) == 0 {
+				return MenuInput{}, fmt.Errorf("no projects linked")
+			}
+			if n < 1 || n > len(cfg.Projects) {
+				return MenuInput{}, fmt.Errorf("unknown project %d (h for help)", n)
+			}
+			return MenuInput{Action: ActionSwitchProject, Text: cfg.Projects[n-1].ID}, nil
+		}
 	}
 
 	if fields := strings.Fields(line); len(fields) >= 1 {
@@ -403,7 +423,7 @@ func resolveMenuInput(cfg *config.Config, p *config.Project, line string) (MenuI
 		}
 		switch strings.ToLower(fields[0]) {
 		case "tk", "tck":
-			return MenuInput{Action: ActionTerminalCheck, TcKillAll: true}, nil
+			return parseTkInput(fields)
 		case "tr", "tcr":
 			return MenuInput{Action: ActionTerminalCheck, TcRestart: true}, nil
 		}

@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Cimmerial/tps/internal/config"
+	"github.com/Cimmerial/tps/internal/instance"
 	"github.com/Cimmerial/tps/internal/ui"
 )
 
@@ -72,6 +74,7 @@ func MaybeAutoUpdate(root string) error {
 	if !result.Updated {
 		return nil
 	}
+	syncInstanceReadmes(root)
 	if err := RestartInteractive(true); err != nil {
 		return fmt.Errorf("restart failed: %w (run tps again)", err)
 	}
@@ -94,7 +97,11 @@ func fileFingerprint(path string) (string, error) {
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
 
-func InstallAndRestart(root string, all bool) error {
+func InstallAndRestart(root string, _ bool) error {
+	if err := PullFastForward(root); err != nil {
+		return err
+	}
+
 	result, err := InstallFromProjectRoot(root)
 	if err != nil {
 		return err
@@ -109,19 +116,28 @@ func InstallAndRestart(root string, all bool) error {
 		source = exe
 	}
 
-	if all {
-		synced, err := syncAllInstances(root, source)
-		if err != nil {
-			return err
-		}
-		if len(synced) > 0 {
-			fmt.Println(ui.Dim(fmt.Sprintf("synced %d other install(s)", len(synced))))
-		}
+	synced, err := syncAllInstances(root, source)
+	if err != nil {
+		return err
+	}
+	if len(synced) > 0 {
+		fmt.Println(ui.Dim(fmt.Sprintf("synced %d other install(s)", len(synced))))
 	}
 
-	updated := result.Updated || all
+	updated := result.Updated || len(synced) > 0
+	syncInstanceReadmes(root)
 	if err := RestartInteractive(updated); err != nil {
 		return fmt.Errorf("restart failed: %w (run tps again)", err)
 	}
 	return nil
+}
+
+func syncInstanceReadmes(tpsRepo string) {
+	cfg, err := config.Load()
+	if err != nil {
+		return
+	}
+	if _, err := instance.SyncAllLinked(tpsRepo, cfg); err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", ui.Dim("instance readme: "+err.Error()))
+	}
 }

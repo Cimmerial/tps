@@ -17,7 +17,7 @@ func optionsCaptureSMSRowDesc(prefs *config.Preferences) string {
 	if to == "" {
 		return base + ui.Dim(" — not set")
 	}
-	return base + ui.Dim(" — ") + ui.Bold(to)
+	return base + ui.Dim(" — ") + ui.Bold(maskSMSTo(to))
 }
 
 func optionsCaptureSMSMenu(_ *config.Preferences, projectID string, statusTick int) (bool, error) {
@@ -25,6 +25,7 @@ func optionsCaptureSMSMenu(_ *config.Preferences, projectID string, statusTick i
 	if err != nil {
 		return false, err
 	}
+	showSMSTo := false
 	for {
 		prefs, err := config.LoadPreferences()
 		if err != nil {
@@ -36,7 +37,7 @@ func optionsCaptureSMSMenu(_ *config.Preferences, projectID string, statusTick i
 		fmt.Println()
 		fmt.Printf("%s\n", ui.SubHeader("capture sms"))
 		fmt.Printf("    %s %s\n", ui.Dim("saved to:"), ui.Dim(prefsPath))
-		fmt.Printf("    %s %s\n", ui.Dim("sms_to:"), smsToDisplay(prefs.SMSTo))
+		fmt.Printf("    %s %s\n", ui.Dim("sms_to:"), smsToDisplay(prefs.SMSTo, showSMSTo))
 		fmt.Printf("    %s %s\n", ui.Dim("sms_shortcut:"), shortcutDisplay(prefs.SMSShortcut))
 		fmt.Println()
 		fmt.Printf("    %s\n", ui.Dim("then enable sms on a command: edit → capture → toggle sms"))
@@ -45,6 +46,7 @@ func optionsCaptureSMSMenu(_ *config.Preferences, projectID string, statusTick i
 			{Num: "1", Desc: ui.Dim("set sms_to (phone number)")},
 			{Num: "2", Desc: ui.Dim("set sms_shortcut (optional Shortcuts name)")},
 			{Num: "3", Desc: ui.Dim("clear sms_to and sms_shortcut")},
+			{Num: "4", Desc: optionsToggleSMSToVisibilityRow(showSMSTo)},
 		})
 		fmt.Println()
 		printNumberedMenuRows([]numberedMenuRow{
@@ -75,6 +77,12 @@ func optionsCaptureSMSMenu(_ *config.Preferences, projectID string, statusTick i
 				return false, err
 			}
 			fmt.Println(ui.Dim("cleared sms preferences"))
+		case 4:
+			if strings.TrimSpace(prefs.SMSTo) == "" {
+				fmt.Println(ui.Dim("sms_to not set"))
+				continue
+			}
+			showSMSTo = !showSMSTo
 		case 0:
 			return false, nil
 		default:
@@ -83,12 +91,41 @@ func optionsCaptureSMSMenu(_ *config.Preferences, projectID string, statusTick i
 	}
 }
 
-func smsToDisplay(v string) string {
+func smsToChangeDisplay(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return "(empty)"
+	}
+	return maskSMSTo(v)
+}
+
+func maskSMSTo(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return ""
+	}
+	if len(v) <= 4 {
+		return strings.Repeat("*", len(v))
+	}
+	return strings.Repeat("*", 6) + v[len(v)-4:]
+}
+
+func optionsToggleSMSToVisibilityRow(visible bool) string {
+	if visible {
+		return ui.Dim("hide sms_to (phone number)")
+	}
+	return ui.Dim("show sms_to (phone number)")
+}
+
+func smsToDisplay(v string, reveal bool) string {
 	v = strings.TrimSpace(v)
 	if v == "" {
 		return ui.Dim("(not set)")
 	}
-	return ui.Bold(v)
+	if reveal {
+		return ui.Bold(v)
+	}
+	return ui.Bold(maskSMSTo(v))
 }
 
 func shortcutDisplay(v string) string {
@@ -101,7 +138,7 @@ func shortcutDisplay(v string) string {
 
 func optionsPromptSMSTo(prefs *config.Preferences) error {
 	fmt.Println()
-	fmt.Printf("    %s %s\n", ui.Dim("current:"), smsToDisplay(prefs.SMSTo))
+	fmt.Printf("    %s %s\n", ui.Dim("current:"), smsToDisplay(prefs.SMSTo, false))
 	line, err := ui.ReadEditedLine("sms_to: ")
 	if err != nil {
 		return err

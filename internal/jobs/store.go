@@ -23,8 +23,9 @@ type Job struct {
 }
 
 type jobFile struct {
-	Jobs    []Job    `yaml:"jobs"`
-	History []string `yaml:"history,omitempty"`
+	Jobs      []Job    `yaml:"jobs"`
+	History   []string `yaml:"history,omitempty"`
+	NextJobID int      `yaml:"next_job_id,omitempty"`
 }
 
 func jobsPath(projectID string) (string, error) {
@@ -108,6 +109,23 @@ func nextID(jobs []Job) int {
 	return max + 1
 }
 
+// allocateJobID returns a monotonic job id (never reused after reap) so Terminal .command titles stay unique.
+func allocateJobID(projectID string) (int, error) {
+	f, err := readFile(projectID)
+	if err != nil {
+		return 0, err
+	}
+	id := f.NextJobID
+	if id <= 0 {
+		id = nextID(f.Jobs)
+	}
+	f.NextJobID = id + 1
+	if err := writeFile(projectID, f); err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
 func appendHistory(projectID, alias string) error {
 	f, err := readFile(projectID)
 	if err != nil {
@@ -134,33 +152,43 @@ func Add(projectID string, job Job) error {
 	return writeFile(projectID, f)
 }
 
-func Kill(projectID string, id int) (int, error) {
+// Kill stops a running job by its 1-based index in the `t` list (not the internal job id).
+func Kill(projectID string, displayNum int) (int, error) {
 	jobs, err := Reap(projectID)
 	if err != nil {
 		return 0, err
 	}
-	if id == 0 {
+	if displayNum == 0 {
 		return killAll(projectID, jobs)
 	}
+	if displayNum < 1 || displayNum > len(jobs) {
+		return 0, fmt.Errorf("no terminal job #%d", displayNum)
+	}
+	target := jobs[displayNum-1]
 	f, err := readFile(projectID)
 	if err != nil {
 		return 0, err
 	}
 	var kept []Job
-	killed := 0
 	for _, j := range jobs {
-		if j.ID == id {
+		if j.ID == target.ID {
 			stopJob(projectID, j)
-			killed++
 			continue
 		}
 		kept = append(kept, j)
 	}
-	if killed == 0 {
-		return 0, fmt.Errorf("no terminal job #%d", id)
-	}
 	f.Jobs = kept
-	return killed, writeFile(projectID, f)
+	return 1, writeFile(projectID, f)
+}
+
+// ListDisplayNumber returns the 1-based `t` list index for an internal job id.
+func ListDisplayNumber(list []Job, jobID int) int {
+	for i, j := range list {
+		if j.ID == jobID {
+			return i + 1
+		}
+	}
+	return 0
 }
 
 func KillAll(projectID string) (int, error) {
