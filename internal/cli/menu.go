@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Cimmerial/tps/internal/config"
+	"github.com/Cimmerial/tps/internal/jobs"
 	"github.com/Cimmerial/tps/internal/ui"
 )
 
@@ -66,7 +67,7 @@ func truncateRunes(s string, max int) string {
 	return s[:max-3] + "..."
 }
 
-func printSessionHeader(p *config.Project, restartBanner string) {
+func printSessionHeader(p *config.Project, projectID string, restartBanner string, statusTick int) {
 	name := ui.Bold(ui.Magenta(p.Name))
 	switch restartBanner {
 	case "updated":
@@ -78,6 +79,18 @@ func printSessionHeader(p *config.Project, restartBanner string) {
 	}
 	printCompactMenu(p)
 	printMenuHints(p)
+	printTerminalStatusLine(projectID, statusTick)
+}
+
+func printTerminalStatusLine(projectID string, tick int) {
+	active, err := jobs.Reap(projectID)
+	if err != nil || len(active) == 0 {
+		return
+	}
+	line := ui.TerminalsRunningLine(len(active), tick)
+	if line != "" {
+		fmt.Println(line)
+	}
 }
 
 func printCompactMenu(p *config.Project) {
@@ -109,7 +122,7 @@ func printFullHelp(p *config.Project) {
 				{"config", "c", "open config.yaml in Cursor/VS Code or $EDITOR"},
 				{"edit", "e", "change a command shell (e hello)"},
 				{"new command", "nc", "nc -n name -a abbrev -c shell (-t terminal, -m capture)"},
-				{"terminals", "tc", "tc · tck · tc -k 1 · tcr"},
+				{"terminals", "t", "t · tk · t -k 1 · tr"},
 				{"shell tips", "", "chain with && or use YAML | for multiple lines"},
 			},
 		},
@@ -294,12 +307,12 @@ func resolveMenuInput(cfg *config.Config, p *config.Project, line string) (MenuI
 
 	if fields := strings.Fields(line); len(fields) >= 1 {
 		switch strings.ToLower(fields[0]) {
-		case "tck":
+		case "tk", "tck":
 			return MenuInput{Action: ActionTerminalCheck, TcKillAll: true}, nil
-		case "tcr":
+		case "tr", "tcr":
 			return MenuInput{Action: ActionTerminalCheck, TcRestart: true}, nil
 		}
-		if strings.EqualFold(fields[0], "tc") || (len(fields) >= 2 && strings.EqualFold(fields[0], "terminal") && strings.EqualFold(fields[1], "check")) {
+		if strings.EqualFold(fields[0], "t") || strings.EqualFold(fields[0], "tc") || (len(fields) >= 2 && strings.EqualFold(fields[0], "terminal") && strings.EqualFold(fields[1], "check")) {
 			return parseTerminalCheck(fields)
 		}
 		if isInstallHelpToken(fields[0]) {

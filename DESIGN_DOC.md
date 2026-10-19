@@ -45,7 +45,7 @@ Defined in config per project: `alias`, `shell`, `abbreviation`, optional `descr
 **Detached run (macOS Terminal.app):**
 
 - Opens a **background** Terminal tab/window (`open -g`), does not steal focus from Cursor/VS Code.
-- **`tc`** list jobs · **`tck`** / **`tc -k`** kill all · **`tc -k N`** one job · **`tcr`** / **`tc -r`** kill all and replay **launch history** in order.
+- **`t`** list jobs · **`tk`** / **`t -k`** kill all · **`t -k N`** one job · **`tr`** / **`t -r`** kill all and replay **launch history** in order. (`tc` / `tck` / `tcr` still work.)
 - Kill: process tree + optional **`--port`** cleanup; close tab by TTY or window title (`<project-id>-<n>.command`).
 - **`capture`:** tee log in run script, match preset (`trycloudflare` / `cf`) or regex → print URL + **clipboard**.
 
@@ -68,7 +68,7 @@ Startup **auto-update** (quiet `go install`) when a tps dev repo is in config, u
 ### Config & persistence
 
 - **Projects:** commands, `command_usage`, `meta_usage`.
-- **Jobs:** per-project YAML under `…/tps/jobs/` (active PIDs, **launch history** for `tcr`).
+- **Jobs:** per-project YAML under `…/tps/jobs/` (active PIDs, **launch history** for `tr`).
 - **PIDs/logs:** `…/tps/jobs/pids/`, `…/logs/` for capture.
 
 ---
@@ -77,7 +77,7 @@ Startup **auto-update** (quiet `go install`) when a tps dev repo is in config, u
 
 ```
 cmd/tps          → main
-internal/cli     → interactive loop, menu resolution, tc/nc/setup/edit/…
+internal/cli     → interactive loop, menu resolution, t/nc/setup/edit/…
 internal/config  → YAML, editor, capture presets
 internal/project → git root, remote, link, resolve
 internal/runner  → foreground `sh -c` in project root; detach heuristics
@@ -105,7 +105,7 @@ internal/ui      → logo, colors, spinner, clipboard, prompt
 |------|--------|
 | Short aliases per project | **Done** |
 | Stay-open REPL + usage-sorted menus | **Done** |
-| Open/manage other terminals | **Done** (detach, tc, kill, restart, capture) |
+| Open/manage other terminals | **Done** (detach, t, kill, restart, capture) |
 | Sequences + wait for events | **Partial** (`capture` regex); no generic step runner yet |
 | Export/import projects & commands | **Partial** (copy `config.yaml`; `ih -copy` / `setup`); no `tps export` command |
 | Run `tps` from anywhere on PATH | **Done** (`go install`, `ih` PATH line) |

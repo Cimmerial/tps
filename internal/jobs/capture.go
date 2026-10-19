@@ -35,21 +35,25 @@ func WatchCapture(logPath, pattern string, timeout time.Duration) {
 		return
 	}
 	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		data, err := os.ReadFile(logPath)
-		if err == nil && len(data) > 0 {
-			if m := re.FindString(string(data)); m != "" {
-				fmt.Print("\n")
-				fmt.Println(m)
-				if err := ui.CopyToClipboard(m); err != nil {
-					fmt.Fprintf(os.Stderr, "%s\n", ui.Dim("capture: clipboard: "+err.Error()))
+	found := false
+	ui.BrailleWait("watching output for link…", func() {
+		for time.Now().Before(deadline) {
+			data, err := os.ReadFile(logPath)
+			if err == nil && len(data) > 0 {
+				if m := re.FindString(string(data)); m != "" {
+					if err := ui.CopyToClipboard(m); err != nil {
+						fmt.Fprintf(os.Stderr, "%s\n", ui.Dim("capture: clipboard: "+err.Error()))
+						return
+					}
+					ui.PrintCaptureResult(m, ui.Green("copied to clipboard"))
+					found = true
 					return
 				}
-				fmt.Println(ui.Green("copied to clipboard"))
-				return
 			}
+			time.Sleep(250 * time.Millisecond)
 		}
-		time.Sleep(250 * time.Millisecond)
+	})
+	if !found {
+		fmt.Fprintf(os.Stderr, "%s\n", ui.Dim("capture: no match yet (still running in terminal)"))
 	}
-	fmt.Fprintf(os.Stderr, "%s\n", ui.Dim("capture: no match yet (still running in terminal)"))
 }

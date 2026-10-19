@@ -36,7 +36,7 @@ func builtInHints(p *config.Project) []hintEntry {
 		}},
 		{key: "ship", abbr: "gs", label: "ship", order: 8, show: func(*config.Project) bool { return true }},
 		{key: "git", abbr: "git", label: "", order: 9, show: func(*config.Project) bool { return true }},
-		{key: "terminals", abbr: "tc", label: "terminals", order: 10, show: func(*config.Project) bool { return true }},
+		{key: "terminals", abbr: "t", label: "terminals", order: 10, show: func(*config.Project) bool { return true }},
 	}
 	out := make([]hintEntry, 0, len(all))
 	for _, h := range all {

@@ -94,14 +94,15 @@ func runInteractive() error {
 	if len(selected.Commands) == 0 {
 		fmt.Println(ui.Dim("no project commands — tps project cmd add <alias> <shell>"))
 	}
-	printSessionHeader(selected, restartBanner)
+	statusTick := 0
+	printSessionHeader(selected, projectID, restartBanner, statusTick)
 
-	activityTick := 0
 	for {
 		active, _ := jobs.Reap(projectID)
-		fmt.Print(ui.PromptBusy(len(active), activityTick))
-		activityTick++
-		line, err := reader.ReadString('\n')
+		line, err := readLine(reader, len(active), statusTick)
+		if len(active) > 0 {
+			statusTick++
+		}
 		if err != nil {
 			return err
 		}
@@ -141,7 +142,7 @@ func runInteractive() error {
 		case ActionClear:
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
-			if err := refreshInteractiveSession(projectID); err != nil {
+			if err := refreshInteractiveSession(projectID, statusTick); err != nil {
 				return err
 			}
 		case ActionConfig:
@@ -189,7 +190,7 @@ func runInteractive() error {
 			}
 			if newID != "" && newID != projectID {
 				projectID = newID
-				if err := refreshInteractiveSession(projectID); err != nil {
+				if err := refreshInteractiveSession(projectID, statusTick); err != nil {
 					return err
 				}
 			}
@@ -220,7 +221,7 @@ func runInteractive() error {
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
 			if err := runTerminalCheck(selected, input); err != nil {
-				fmt.Fprintf(os.Stderr, "tc: %v\n", err)
+				fmt.Fprintf(os.Stderr, "t: %v\n", err)
 			}
 		case ActionRun:
 			cmd := selected.FindCommand(input.Alias)
@@ -260,14 +261,14 @@ func runInteractive() error {
 	}
 }
 
-func refreshInteractiveSession(projectID string) error {
+func refreshInteractiveSession(projectID string, statusTick int) error {
 	ui.ClearScreen()
 	ui.PrintLogo()
 	_, selected, err := loadProject(projectID)
 	if err != nil {
 		return err
 	}
-	printSessionHeader(selected, "")
+	printSessionHeader(selected, projectID, "", statusTick)
 	return nil
 }
 

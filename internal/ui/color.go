@@ -1,6 +1,9 @@
 package ui
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 const (
 	reset        = "\033[0m"
@@ -42,13 +45,27 @@ func Prompt() string {
 	return PromptBusy(0, 0)
 }
 
+var braillePromptFrames = []string{"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
+
+func BrailleFrame(tick int) string {
+	if len(braillePromptFrames) == 0 {
+		return "⣾"
+	}
+	return braillePromptFrames[tick%len(braillePromptFrames)]
+}
+
 func PromptBusy(running int, tick int) string {
 	if running <= 0 {
 		return Cyan("> ")
 	}
-	frames := []string{"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
-	frame := frames[tick%len(frames)]
-	return Dim(frame+" ") + Cyan("> ")
+	return Dim(BrailleFrame(tick)+" ") + Cyan("> ")
+}
+
+func TerminalsRunningLine(count int, tick int) string {
+	if count <= 0 {
+		return ""
+	}
+	return Dim(BrailleFrame(tick) + " " + fmt.Sprintf("%d terminal(s) running", count))
 }
 
 func Logo(s string) string {
