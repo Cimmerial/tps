@@ -32,10 +32,36 @@ simplified_output() {
 }
 
 git_quiet() {
+	local cmd="$1"
+	shift
 	if simplified_output; then
-		git -q "$@"
+		git "$cmd" --quiet "$@"
 	else
-		git "$@"
+		git "$cmd" "$@"
+	fi
+}
+
+outcome_color() {
+	local code="$1" text="$2"
+	if [[ "${TPSU_COLOR:-}" == "1" ]]; then
+		printf '\033[%sm%s\033[0m' "$code" "$text"
+	else
+		printf '%s' "$text"
+	fi
+}
+
+print_outcome() {
+	local ok="$1" label="$2" detail="$3"
+	local badge
+	if [[ "$ok" == true ]]; then
+		badge="$(outcome_color 32 SUCCESS)"
+	else
+		badge="$(outcome_color 31 FAILURE)"
+	fi
+	if [[ -n "$detail" ]]; then
+		printf '%s — %s  %s\n' "$label" "$detail" "$badge"
+	else
+		printf '%s  %s\n' "$label" "$badge"
 	fi
 }
 
@@ -156,16 +182,17 @@ if simplified_output; then
 			?\ *) skip_count=$((skip_count + 1)) ;;
 			esac
 		done <<<"$test_out"
+		test_detail="all packages passed"
 		if [[ "$ok_count" -gt 0 && "$skip_count" -gt 0 ]]; then
-			echo "tests ok ($ok_count packages, $skip_count without tests)"
+			test_detail="$ok_count packages passed, $skip_count without tests"
 		elif [[ "$skip_count" -gt 0 ]]; then
-			echo "tests ok ($skip_count packages without tests)"
+			test_detail="$skip_count packages without tests"
 		elif [[ "$ok_count" -gt 0 ]]; then
-			echo "tests ok ($ok_count packages)"
-		else
-			echo "tests ok"
+			test_detail="$ok_count packages passed"
 		fi
+		print_outcome true tests "$test_detail"
 	else
+		print_outcome false tests "see output below"
 		echo "$test_out"
 		exit 1
 	fi
@@ -177,21 +204,48 @@ fi
 if ! git diff --quiet -- "$VERSION_FILE"; then
 	git add "$VERSION_FILE"
 	if simplified_output; then
-		git_quiet commit -m "release $tag"
+		if git_quiet commit -m "release $tag"; then
+			print_outcome true commit "release $tag"
+		else
+			print_outcome false commit "release $tag"
+			exit 1
+		fi
 	else
 		git commit -m "release $tag"
 	fi
 fi
 
-git tag -a "$tag" -m "release $tag"
+if ! git tag -a "$tag" -m "release $tag"; then
+	if simplified_output; then
+		print_outcome false tag "$tag"
+	fi
+	exit 1
+fi
+if simplified_output; then
+	print_outcome true tag "$tag"
+fi
 
 if simplified_output; then
-	git_quiet push "$REMOTE" "$BRANCH"
-	git_quiet push "$REMOTE" "$tag"
+	if git_quiet push "$REMOTE" "$BRANCH"; then
+		print_outcome true push "$REMOTE $BRANCH"
+	else
+		print_outcome false push "$REMOTE $BRANCH"
+		exit 1
+	fi
+	if git_quiet push "$REMOTE" "$tag"; then
+		print_outcome true push "$REMOTE $tag"
+	else
+		print_outcome false push "$REMOTE $tag"
+		exit 1
+	fi
 else
 	git push "$REMOTE" "$BRANCH"
 	git push "$REMOTE" "$tag"
 fi
 
 echo
-echo "Pushed $tag. Watch GitHub Actions → release, then users can re-run install.ps1 / install.sh."
+if simplified_output; then
+	print_outcome true release "pushed $tag — watch GitHub Actions → release, then users can re-run install.ps1 / install.sh"
+else
+	echo "Pushed $tag. Watch GitHub Actions → release, then users can re-run install.ps1 / install.sh."
+fi

@@ -3,20 +3,72 @@ package runner
 import (
 	"fmt"
 	"strings"
-
-	"github.com/Cimmerial/tps/internal/ui"
 )
 
-// summarizeSuccessOutput returns a short line for captured stdout on success, or "" when nothing to print.
-func summarizeSuccessOutput(script, combined string) string {
-	if strings.Contains(script, "go test") {
-		return summarizeGoTest(combined)
-	}
-	return ""
+type outcomeSummary struct {
+	label  string
+	detail string
 }
 
-func summarizeGoTest(out string) string {
-	var ok, skipped, fail int
+// summarizeSuccess returns a short description for a successful captured run.
+func summarizeSuccess(script, combined string) outcomeSummary {
+	if strings.Contains(script, "go test") {
+		return summarizeGoTestSuccess(combined)
+	}
+	script = strings.TrimSpace(script)
+	if script == "" {
+		return outcomeSummary{label: "run", detail: "completed"}
+	}
+	if len(script) > 72 {
+		script = script[:69] + "..."
+	}
+	return outcomeSummary{label: "run", detail: script}
+}
+
+func summarizeFailure(script, combined string, exitCode int) outcomeSummary {
+	if strings.Contains(script, "go test") {
+		if s := summarizeGoTestFailure(combined); s.detail != "" {
+			return s
+		}
+	}
+	if exitCode != 0 {
+		return outcomeSummary{label: stepLabel(script), detail: fmt.Sprintf("exit %d", exitCode)}
+	}
+	return outcomeSummary{label: stepLabel(script), detail: "failed"}
+}
+
+func stepLabel(script string) string {
+	if strings.Contains(script, "go test") {
+		return "tests"
+	}
+	return "run"
+}
+
+func summarizeGoTestSuccess(out string) outcomeSummary {
+	ok, skipped, fail := countGoTestLines(out)
+	if fail > 0 {
+		return summarizeGoTestFailure(out)
+	}
+	detail := "all packages passed"
+	if ok > 0 && skipped > 0 {
+		detail = fmt.Sprintf("%d packages passed, %d without tests", ok, skipped)
+	} else if skipped > 0 {
+		detail = fmt.Sprintf("%d packages without tests", skipped)
+	} else if ok > 0 {
+		detail = fmt.Sprintf("%d packages passed", ok)
+	}
+	return outcomeSummary{label: "tests", detail: detail}
+}
+
+func summarizeGoTestFailure(out string) outcomeSummary {
+	_, _, fail := countGoTestLines(out)
+	if fail > 0 {
+		return outcomeSummary{label: "tests", detail: fmt.Sprintf("%d package(s) failed", fail)}
+	}
+	return outcomeSummary{label: "tests", detail: "failed"}
+}
+
+func countGoTestLines(out string) (ok, skipped, fail int) {
 	for _, line := range strings.Split(out, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -35,18 +87,5 @@ func summarizeGoTest(out string) string {
 			fail++
 		}
 	}
-	if fail > 0 {
-		return ""
-	}
-	total := ok + skipped
-	if total == 0 {
-		return ui.Green("tests ok")
-	}
-	if skipped > 0 && ok > 0 {
-		return ui.Green(fmt.Sprintf("tests ok (%d packages, %d without tests)", ok, skipped))
-	}
-	if skipped > 0 {
-		return ui.Green(fmt.Sprintf("tests ok (%d packages without tests)", skipped))
-	}
-	return ui.Green(fmt.Sprintf("tests ok (%d packages)", ok))
+	return ok, skipped, fail
 }

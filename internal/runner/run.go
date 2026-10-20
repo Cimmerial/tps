@@ -52,6 +52,8 @@ func RunScriptCaptureStderr(p *config.Project, script string) (int, string, erro
 	if err := c.Run(); err != nil {
 		if exit, ok := err.(*exec.ExitError); ok {
 			if ui.SimplifiedOutput() {
+				sum := summarizeFailure(script, buf.String(), exit.ExitCode())
+				ui.PrintOutcome(false, sum.label, sum.detail)
 				_, _ = os.Stdout.Write(buf.Bytes())
 			}
 			return exit.ExitCode(), buf.String(), nil
@@ -59,9 +61,8 @@ func RunScriptCaptureStderr(p *config.Project, script string) (int, string, erro
 		return 1, buf.String(), err
 	}
 	if ui.SimplifiedOutput() {
-		if line := summarizeSuccessOutput(script, buf.String()); line != "" {
-			fmt.Println(line)
-		}
+		sum := summarizeSuccess(script, buf.String())
+		ui.PrintOutcome(true, sum.label, sum.detail)
 	}
 	return 0, buf.String(), nil
 }

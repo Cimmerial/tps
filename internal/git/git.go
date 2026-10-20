@@ -100,17 +100,52 @@ func ShipWithOptions(dir, message string, opts *ShipOptions) (int, error) {
 		return code, err
 	}
 	if code != 0 {
+		printShipStepOutcome(dir, false, "commit", shipStepDetail(dir, message, code))
 		return code, nil
 	}
+	printShipStepOutcome(dir, true, "commit", shipStepDetail(dir, message, 0))
 
 	code, err = Run(dir, []string{"push"})
 	if err != nil {
 		return code, err
 	}
-	if code == 0 {
-		printShipOutcome(dir, message)
+	if code != 0 {
+		printShipStepOutcome(dir, false, "push", shipPushDetail(dir, code))
+		return code, nil
 	}
+	printShipStepOutcome(dir, true, "push", shipPushDetail(dir, 0))
+	printShipOutcome(dir, message)
 	return code, nil
+}
+
+func printShipStepOutcome(dir string, ok bool, step, detail string) {
+	if !ui.SimplifiedOutput() {
+		return
+	}
+	ui.PrintOutcome(ok, step, detail)
+}
+
+func shipStepDetail(dir, message string, exitCode int) string {
+	if exitCode != 0 {
+		return fmt.Sprintf("exit %d", exitCode)
+	}
+	if line := gitOutput(dir, "log", "-1", "--oneline"); line != "" {
+		return line
+	}
+	return message
+}
+
+func shipPushDetail(dir string, exitCode int) string {
+	if exitCode != 0 {
+		return fmt.Sprintf("exit %d", exitCode)
+	}
+	if line := gitOutput(dir, "status", "-sb"); line != "" {
+		return line
+	}
+	if branch := gitOutput(dir, "rev-parse", "--abbrev-ref", "HEAD"); branch != "" {
+		return branch
+	}
+	return "pushed"
 }
 
 func printShipOutcome(dir, message string) {
@@ -121,6 +156,9 @@ func printShipOutcome(dir, message string) {
 	}
 	if line := gitOutput(dir, "status", "-sb"); line != "" {
 		fmt.Println(ui.Dim(line))
+	}
+	if ui.SimplifiedOutput() {
+		ui.PrintOutcome(true, "ship", message)
 	}
 	fmt.Println()
 }

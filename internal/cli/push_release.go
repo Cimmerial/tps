@@ -45,6 +45,9 @@ func runPushRelease(p *config.Project, inputs []string) (int, error) {
 	cmd.Stdin = os.Stdin
 	if ui.SimplifiedOutput() {
 		cmd.Env = append(os.Environ(), "TPS_SIMPLIFIED_OUTPUT=1")
+		if ui.ColorEnabled() {
+			cmd.Env = append(cmd.Env, "TPSU_COLOR=1")
+		}
 	}
 	if err := cmd.Run(); err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
