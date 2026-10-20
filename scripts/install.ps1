@@ -30,11 +30,17 @@ function Install-GoModule {
     Install-Binary (Join-Path $goBin "tps.exe")
 }
 
+function Stop-TpsIfRunning {
+    Get-Process -Name tps -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 200
+}
+
 function Install-Binary {
     param([string]$SourceExe)
     if (-not (Test-Path $SourceExe)) {
         throw "missing binary: $SourceExe"
     }
+    Stop-TpsIfRunning
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
     $dest = Join-Path $InstallDir "tps.exe"
     $staging = "$dest.new"

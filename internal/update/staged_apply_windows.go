@@ -21,11 +21,18 @@ func ApplyStagedWindowsBinaryIfNeeded() error {
 	if from == "" || to == "" {
 		return nil
 	}
-	if os.Getenv(envStagedFrom) != "" {
+	handoff := os.Getenv(envStagedFrom) != ""
+	if handoff {
 		time.Sleep(350 * time.Millisecond)
 	}
+	tries := 3
+	pause := 50 * time.Millisecond
+	if handoff {
+		tries = 25
+		pause = 150 * time.Millisecond
+	}
 	var lastErr error
-	for i := 0; i < 25; i++ {
+	for i := 0; i < tries; i++ {
 		err := os.Rename(from, to)
 		if err == nil {
 			_ = os.Unsetenv(envStagedFrom)
@@ -33,7 +40,7 @@ func ApplyStagedWindowsBinaryIfNeeded() error {
 			return nil
 		}
 		lastErr = err
-		time.Sleep(150 * time.Millisecond)
+		time.Sleep(pause)
 	}
 	return fmt.Errorf("apply staged binary %s -> %s: %w", from, to, lastErr)
 }
