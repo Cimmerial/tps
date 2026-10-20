@@ -8,6 +8,7 @@ import (
 
 	"github.com/Cimmerial/tps/internal/config"
 	"github.com/Cimmerial/tps/internal/notify"
+	"github.com/Cimmerial/tps/internal/platform"
 	"github.com/Cimmerial/tps/internal/ui"
 )
 
@@ -59,6 +60,9 @@ func WatchCapture(opts CaptureOptions) {
 				msgs = append(msgs, ui.Green("copied to clipboard"))
 			}
 		case config.CaptureSMS:
+			if !platform.SupportsCaptureSMS() {
+				continue
+			}
 			if err := notify.SendSMS(opts.SMSTo, match, opts.SMSShortcut); err != nil {
 				fmt.Fprintf(os.Stderr, "%s\n", ui.Dim("capture: sms: "+err.Error()))
 			} else {

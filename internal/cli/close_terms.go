@@ -9,11 +9,12 @@ import (
 )
 
 func runCloseAllTerms() (jobs.CloseAllTermsResult, error) {
+	label := "closing terminals…"
 	if runtime.GOOS != "darwin" {
-		return jobs.CloseAllTermsResult{}, fmt.Errorf("vite: macOS only (Terminal.app)")
+		label = "stopping terminals…"
 	}
 	var result jobs.CloseAllTermsResult
-	err := runWithBraille("closing terminals…", func() error {
+	err := runWithBraille(label, func() error {
 		result = jobs.CloseAllTerminalWindows()
 		return nil
 	})
@@ -21,11 +22,19 @@ func runCloseAllTerms() (jobs.CloseAllTermsResult, error) {
 }
 
 func printCloseAllTermsDone(result jobs.CloseAllTermsResult) {
-	if result.Count == 0 {
-		fmt.Println(ui.Green("closed 0 Terminal.app windows"))
-		return
+	if runtime.GOOS == "darwin" {
+		if result.Count == 0 {
+			fmt.Println(ui.Green("closed 0 Terminal.app windows"))
+			return
+		}
+		fmt.Println(ui.Green(fmt.Sprintf("closed %d Terminal.app window(s)", result.Count)))
+	} else {
+		if result.Count == 0 {
+			fmt.Println(ui.Green("stopped 0 tps terminal job(s)"))
+			return
+		}
+		fmt.Println(ui.Green(fmt.Sprintf("stopped %d tps terminal job(s)", result.Count)))
 	}
-	fmt.Println(ui.Green(fmt.Sprintf("closed %d Terminal.app window(s)", result.Count)))
 	for i, label := range result.Labels {
 		if i >= 5 {
 			break

@@ -9,6 +9,7 @@ import (
 
 	"github.com/Cimmerial/tps/internal/config"
 	"github.com/Cimmerial/tps/internal/instance"
+	"github.com/Cimmerial/tps/internal/platform"
 	"github.com/Cimmerial/tps/internal/jobs"
 	"github.com/Cimmerial/tps/internal/ui"
 )
@@ -111,6 +112,7 @@ func printCompactMenu(p *config.Project) {
 }
 
 func printFullHelp(p *config.Project) {
+	closeName, closeAbbrev, closeDesc := platform.CloseAllTermsHelp()
 	sections := []helpSection{
 		{
 			title: "session",
@@ -120,9 +122,9 @@ func printFullHelp(p *config.Project) {
 				cmdRow("quit", "q", "exit tps"),
 				cmdRow("project", "p · p1", "switch linked project (p1, p2, … or p name)"),
 				cmdRow("pb", "", "switch back to previous project"),
-				cmdRow("options", "o", "logo/color, terminal colors, capture sms, default IDE, preferred browser"),
+				cmdRow("options", "o", platform.OptionsMenuDescription()),
 				cmdRow("open in desired ide", "ide", "open this project in Cursor/VS Code (or your default IDE)"),
-				cmdRow("close all terms", "vite", "macOS: kill tab processes and close every Terminal.app window"),
+				cmdRow(closeName, closeAbbrev, closeDesc),
 			},
 		},
 		{
@@ -131,7 +133,7 @@ func printFullHelp(p *config.Project) {
 				cmdRow("config", "c", "open config.yaml in Cursor/VS Code or $EDITOR"),
 				cmdRow("edit", "e", "edit commands, tags, shells (e hello)"),
 				cmdRow("new command", "nc", "nc -n name -a abbrev -c shell (-tags admin,git -t terminal, -m capture); run: ic -user"),
-				cmdRow("terminals", "t", "t · tk · tk -a · vite · t -k 1 · tr"),
+				cmdRow("terminals", "t", platform.TerminalsHelpLine()),
 				cmdRow("export", "export", "export project YAML (export -a for all)"),
 				cmdRow("import", "import", "import path/to/file.tps.yaml"),
 				cmdRow("config examples", "ce", "YAML & nc examples for new commands"),

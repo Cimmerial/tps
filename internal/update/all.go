@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -35,7 +36,17 @@ func discoverTPSBinaries(projectRoot string) []string {
 		paths = append(paths, abs)
 	}
 
-	if out, err := exec.Command("which", "-a", "tps").Output(); err == nil {
+	if runtime.GOOS == "windows" {
+		if out, err := exec.Command("where", "tps").Output(); err == nil {
+			for _, line := range strings.Split(string(out), "\r\n") {
+				line = strings.TrimSpace(line)
+				if line == "" {
+					continue
+				}
+				add(line)
+			}
+		}
+	} else if out, err := exec.Command("which", "-a", "tps").Output(); err == nil {
 		for _, line := range strings.Split(string(out), "\n") {
 			add(strings.TrimSpace(line))
 		}
@@ -43,6 +54,9 @@ func discoverTPSBinaries(projectRoot string) []string {
 
 	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
 		add(filepath.Join(dir, "tps"))
+		if runtime.GOOS == "windows" {
+			add(filepath.Join(dir, "tps.exe"))
+		}
 	}
 
 	add(filepath.Join(projectRoot, "tps"))
@@ -66,10 +80,13 @@ func syncAllInstances(projectRoot, source string) ([]string, error) {
 		if sameFile(source, dst) {
 			continue
 		}
-		if err := copyBinary(source, dst); err != nil {
+		staged, err := installBinary(source, dst)
+		if err != nil {
 			return updated, fmt.Errorf("copy to %s: %w", dst, err)
 		}
-		updated = append(updated, dst)
+		if staged || !sameFile(source, dst) {
+			updated = append(updated, dst)
+		}
 	}
 	return updated, nil
 }

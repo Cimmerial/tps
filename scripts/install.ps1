@@ -50,7 +50,7 @@ function Ensure-Path {
         New-Item -ItemType File -Path $profile -Force | Out-Null
     }
     $line = '$env:Path += ";' + $InstallDir + '"'
-    if (-not (Select-String -Path $profile -Pattern $InstallDir -Quiet -ErrorAction SilentlyContinue)) {
+    if (-not (Select-String -Path $profile -Pattern $InstallDir -SimpleMatch -Quiet -ErrorAction SilentlyContinue)) {
         Add-Content -Path $profile -Value $line
     }
 }

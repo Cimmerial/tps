@@ -8,6 +8,7 @@ import (
 	"github.com/Cimmerial/tps/internal/browser"
 	"github.com/Cimmerial/tps/internal/config"
 	"github.com/Cimmerial/tps/internal/ide"
+	"github.com/Cimmerial/tps/internal/platform"
 	"github.com/Cimmerial/tps/internal/ui"
 	"github.com/Cimmerial/tps/internal/ui/logos"
 )
@@ -96,6 +97,59 @@ func finishOptionsSession(projectID string, statusTick int, start prefSnapshot) 
 	return nil
 }
 
+func optionsTopMenuRows(prefs *config.Preferences) []numberedMenuRow {
+	rows := []numberedMenuRow{
+		{Num: "1", Desc: ui.Dim("title card logo")},
+		{Num: "2", Desc: ui.Dim("title card color")},
+		{Num: "3", Desc: ui.Dim("terminal colors")},
+	}
+	if platform.SupportsCaptureSMS() {
+		rows = append(rows, numberedMenuRow{Num: "4", Desc: optionsCaptureSMSRowDesc(prefs)})
+	}
+	n := len(rows) + 1
+	rows = append(rows,
+		numberedMenuRow{Num: strconv.Itoa(n), Desc: optionsPreferredIDERowDesc(prefs)},
+		numberedMenuRow{Num: strconv.Itoa(n + 1), Desc: optionsPreferredBrowserRowDesc(prefs)},
+	)
+	return rows
+}
+
+func runOptionsTopMenuChoice(choice int, prefs *config.Preferences, projectID string, statusTick int) (handled bool, changed bool, err error) {
+	n := 1
+	if choice == n {
+		changed, err = optionsLogoMenu(prefs, projectID, statusTick)
+		return true, changed, err
+	}
+	n++
+	if choice == n {
+		changed, err = optionsTitleCardColorMenu(prefs, projectID, statusTick)
+		return true, changed, err
+	}
+	n++
+	if choice == n {
+		changed, err = optionsColorsMenu(prefs, projectID, statusTick)
+		return true, changed, err
+	}
+	n++
+	if platform.SupportsCaptureSMS() {
+		if choice == n {
+			changed, err = optionsCaptureSMSMenu(prefs, projectID, statusTick)
+			return true, changed, err
+		}
+		n++
+	}
+	if choice == n {
+		changed, err = optionsPreferredIDEMenu(prefs, projectID, statusTick)
+		return true, changed, err
+	}
+	n++
+	if choice == n {
+		changed, err = optionsPreferredBrowserMenu(prefs, projectID, statusTick)
+		return true, changed, err
+	}
+	return false, false, nil
+}
+
 func runOptionsMenu(projectID string, statusTick int) error {
 	startPrefs, err := config.LoadPreferences()
 	if err != nil {
@@ -114,14 +168,7 @@ func runOptionsMenu(projectID string, statusTick int) error {
 		fmt.Println()
 		fmt.Printf("    %s\n", ui.Dim("numbered choices — 0 or q = done"))
 		fmt.Println()
-		printNumberedMenuRows([]numberedMenuRow{
-			{Num: "1", Desc: ui.Dim("title card logo")},
-			{Num: "2", Desc: ui.Dim("title card color")},
-			{Num: "3", Desc: ui.Dim("terminal colors")},
-			{Num: "4", Desc: optionsCaptureSMSRowDesc(prefs)},
-			{Num: "5", Desc: optionsPreferredIDERowDesc(prefs)},
-			{Num: "6", Desc: optionsPreferredBrowserRowDesc(prefs)},
-		})
+		printNumberedMenuRows(optionsTopMenuRows(prefs))
 		fmt.Println()
 		printNumberedMenuRows([]numberedMenuRow{
 			{Num: "0", Abbrev: "q", Desc: ui.Dim("done")},
@@ -134,57 +181,16 @@ func runOptionsMenu(projectID string, statusTick int) error {
 		if back {
 			return finishOptionsSession(projectID, statusTick, startSnap)
 		}
-		switch choice {
-		case 1:
-			changed, err := optionsLogoMenu(prefs, projectID, statusTick)
-			if err != nil {
-				return err
-			}
-			if changed {
-				continue
-			}
-		case 2:
-			changed, err := optionsTitleCardColorMenu(prefs, projectID, statusTick)
-			if err != nil {
-				return err
-			}
-			if changed {
-				continue
-			}
-		case 3:
-			changed, err := optionsColorsMenu(prefs, projectID, statusTick)
-			if err != nil {
-				return err
-			}
-			if changed {
-				continue
-			}
-		case 4:
-			changed, err := optionsCaptureSMSMenu(prefs, projectID, statusTick)
-			if err != nil {
-				return err
-			}
-			if changed {
-				continue
-			}
-		case 5:
-			changed, err := optionsPreferredIDEMenu(prefs, projectID, statusTick)
-			if err != nil {
-				return err
-			}
-			if changed {
-				continue
-			}
-		case 6:
-			changed, err := optionsPreferredBrowserMenu(prefs, projectID, statusTick)
-			if err != nil {
-				return err
-			}
-			if changed {
-				continue
-			}
-		default:
+		handled, changed, err := runOptionsTopMenuChoice(choice, prefs, projectID, statusTick)
+		if err != nil {
+			return err
+		}
+		if !handled {
 			fmt.Println(ui.Dim("invalid choice"))
+			continue
+		}
+		if changed {
+			continue
 		}
 	}
 }

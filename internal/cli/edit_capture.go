@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Cimmerial/tps/internal/config"
+	"github.com/Cimmerial/tps/internal/platform"
 	"github.com/Cimmerial/tps/internal/ui"
 )
 
@@ -29,13 +30,19 @@ func editCaptureSubmenu(reader *bufio.Reader, projectID, alias string) error {
 		fmt.Println()
 		fmt.Printf("    %s\n", ui.Dim("numbered choices — 0 or q = back"))
 		fmt.Println()
-		printNumberedMenuRows([]numberedMenuRow{
+		captureRows := []numberedMenuRow{
 			{Num: "1", Desc: ui.Dim("capture pattern (preset or regex)")},
 			{Num: "2", Status: editFieldSetMark(cmd.HasCaptureAction(config.CapturePrint)), Desc: ui.Dim("toggle print")},
 			{Num: "3", Status: editFieldSetMark(cmd.HasCaptureAction(config.CaptureClipboard)), Desc: ui.Dim("toggle clipboard")},
-			{Num: "4", Status: editFieldSetMark(cmd.HasCaptureAction(config.CaptureSMS)), Desc: ui.Dim("toggle sms (set phone in options → capture sms)")},
-			{Num: "0", Desc: ui.Dim("back (q)")},
-		})
+		}
+		if platform.SupportsCaptureSMS() {
+			captureRows = append(captureRows, numberedMenuRow{
+				Num: "4", Status: editFieldSetMark(cmd.HasCaptureAction(config.CaptureSMS)),
+				Desc: ui.Dim("toggle sms (set phone in options → capture sms)"),
+			})
+		}
+		captureRows = append(captureRows, numberedMenuRow{Num: "0", Desc: ui.Dim("back (q)")})
+		printNumberedMenuRows(captureRows)
 		fmt.Println()
 		if len(cmd.Capture) == 0 {
 			fmt.Println(ui.Dim("set a pattern first (e.g. url, trycloudflare)"))
@@ -60,6 +67,10 @@ func editCaptureSubmenu(reader *bufio.Reader, projectID, alias string) error {
 				return err
 			}
 		case 4:
+			if !platform.SupportsCaptureSMS() {
+				fmt.Println(ui.Dim("invalid choice"))
+				continue
+			}
 			if err := editToggleCaptureAction(projectID, alias, config.CaptureSMS); err != nil {
 				return err
 			}

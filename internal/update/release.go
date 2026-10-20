@@ -63,11 +63,12 @@ func InstallFromGitHubRelease() (InstallResult, error) {
 	}
 
 	before, _ := fileFingerprint(dest)
-	if err := copyBinary(bin, dest); err != nil {
+	staged, err := installBinary(bin, dest)
+	if err != nil {
 		return InstallResult{}, err
 	}
 	after, _ := fileFingerprint(dest)
-	updated := before != after
+	updated := staged || before != after
 	if before == "" && after != "" {
 		updated = true
 	}
