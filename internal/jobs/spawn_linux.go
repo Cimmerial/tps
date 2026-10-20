@@ -58,11 +58,11 @@ func linuxTerminalLauncher(script string) (string, []string) {
 		bin  string
 		args func(string) []string
 	}{
-		{"wezterm", func(s string) []string {"start", "--", "bash", "-l", s}},
-		{"kitty", func(s string) []string {"bash", "-l", s}},
-		{"gnome-terminal", func(s string) []string {"--", "bash", "-l", s}},
-		{"x-terminal-emulator", func(s string) []string {"-e", "bash", "-l", s}},
-		{"xterm", func(s string) []string {"-e", "bash", "-l", s}},
+		{"wezterm", func(s string) []string { return []string{"start", "--", "bash", "-l", s} }},
+		{"kitty", func(s string) []string { return []string{"bash", "-l", s} }},
+		{"gnome-terminal", func(s string) []string { return []string{"--", "bash", "-l", s} }},
+		{"x-terminal-emulator", func(s string) []string { return []string{"-e", "bash", "-l", s} }},
+		{"xterm", func(s string) []string { return []string{"-e", "bash", "-l", s} }},
 	}
 	for _, c := range candidates {
 		if path, err := exec.LookPath(c.bin); err == nil {
