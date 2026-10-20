@@ -29,3 +29,16 @@ func stdoutIsTTY() bool {
 func stdinIsTTY() bool {
 	return term.IsTerminal(int(os.Stdin.Fd()))
 }
+
+// RestoreStdin returns stdin to cooked mode (e.g. before handing the console to a child process).
+func RestoreStdin() {
+	if !stdinIsTTY() {
+		return
+	}
+	fd := int(os.Stdin.Fd())
+	state, err := term.GetState(fd)
+	if err != nil {
+		return
+	}
+	_ = term.Restore(fd, state)
+}

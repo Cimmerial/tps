@@ -3,6 +3,8 @@ package cli
 import (
 	"os"
 	"strings"
+
+	"github.com/Cimmerial/tps/internal/update"
 )
 
 const flagUpdated = "--tps-updated"
@@ -26,6 +28,8 @@ func peelRestartFlagsFromArgv() string {
 			status = "uptodate"
 		case strings.HasPrefix(os.Args[i], flagSessionProjectPrefix):
 			sessionRestartProjectID = strings.TrimPrefix(os.Args[i], flagSessionProjectPrefix)
+		case os.Args[i] == update.FlagApplyStaged:
+			continue
 		default:
 			out = append(out, os.Args[i])
 		}

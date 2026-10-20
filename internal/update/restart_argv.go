@@ -29,7 +29,7 @@ func buildRestartArgv() (bin string, argv []string, err error) {
 	}
 	for i := 1; i < len(os.Args); i++ {
 		a := os.Args[i]
-		if a == flagUpdated || a == flagUpToDate {
+		if a == flagUpdated || a == flagUpToDate || a == FlagApplyStaged {
 			continue
 		}
 		if strings.HasPrefix(a, flagSessionProjectPrefix) {

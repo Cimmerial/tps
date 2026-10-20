@@ -3,7 +3,9 @@ package cli
 import (
 	"fmt"
 	"os"
+	"runtime"
 
+	"github.com/Cimmerial/tps/internal/update"
 	"github.com/spf13/cobra"
 )
 
@@ -20,6 +22,11 @@ var rootCmd = &cobra.Command{
 
 // Execute is called from main.
 func Execute() error {
+	if runtime.GOOS == "windows" {
+		if err := update.ApplyStagedWindowsBinaryIfNeeded(); err != nil {
+			fmt.Fprintf(os.Stderr, "update: %v\n", err)
+		}
+	}
 	sessionRestartBanner = peelRestartFlagsFromArgv()
 	return rootCmd.Execute()
 }

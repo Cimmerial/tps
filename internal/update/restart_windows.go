@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"strings"
+
+	"github.com/Cimmerial/tps/internal/ui"
 )
 
-// RestartInteractive exits and re-runs tps (applies any staged .new binary first).
+// RestartInteractive starts a fresh tps in this console and exits the current process.
 func RestartInteractive(updated bool) error {
 	bin, argv, err := buildRestartArgv()
 	if err != nil {
@@ -22,57 +22,26 @@ func RestartInteractive(updated bool) error {
 		argv = append(argv, flagUpToDate)
 	}
 
-	parent := os.Getpid()
-	script, err := writeWindowsRestartScript(parent, bin, argv)
-	if err != nil {
-		return err
+	args := argv[1:]
+	env := os.Environ()
+	if pairs := pendingWindowsReplacements(); len(pairs) > 0 {
+		p := pairs[0]
+		env = append(env, envStagedFrom+"="+p.Staging, envStagedTo+"="+p.Dest)
+		args = append(args, FlagApplyStaged)
+		clearWindowsReplaceQueue()
 	}
 
-	cmd := exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script)
+	ui.RestoreStdin()
+	fmt.Print("\r\n")
+
+	cmd := exec.Command(bin, args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Env = env
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("start updater: %w", err)
+		return fmt.Errorf("restart tps: %w", err)
 	}
 	os.Exit(0)
 	return nil
-}
-
-func writeWindowsRestartScript(parent int, bin string, argv []string) (string, error) {
-	tmp, err := os.MkdirTemp("", "tps-restart-*")
-	if err != nil {
-		return "", err
-	}
-	script := filepath.Join(tmp, "restart.ps1")
-
-	var b strings.Builder
-	b.WriteString("$ErrorActionPreference = 'Stop'\n")
-	b.WriteString(fmt.Sprintf("$parent = %d\n", parent))
-	b.WriteString("Wait-Process -Id $parent -ErrorAction SilentlyContinue\n")
-	b.WriteString("Start-Sleep -Milliseconds 400\n")
-	for _, pair := range pendingWindowsReplacements() {
-		b.WriteString(fmt.Sprintf("Move-Item -LiteralPath %s -Destination %s -Force\n", psLiteral(pair.Staging), psLiteral(pair.Dest)))
-	}
-	b.WriteString(fmt.Sprintf("$bin = %s\n", psLiteral(bin)))
-	argParts := make([]string, 0, len(argv)-1)
-	for _, a := range argv[1:] {
-		argParts = append(argParts, psLiteral(a))
-	}
-	if len(argParts) == 0 {
-		b.WriteString("& $bin\n")
-	} else {
-		b.WriteString(fmt.Sprintf("$tpsArgs = @(%s)\n", strings.Join(argParts, ", ")))
-		b.WriteString("& $bin @tpsArgs\n")
-	}
-	b.WriteString("exit $LASTEXITCODE\n")
-
-	if err := os.WriteFile(script, []byte(b.String()), 0o600); err != nil {
-		return "", err
-	}
-	return script, nil
-}
-
-func psLiteral(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
 }
