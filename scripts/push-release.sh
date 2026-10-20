@@ -43,11 +43,7 @@ git_quiet() {
 
 outcome_color() {
 	local code="$1" text="$2"
-	if [[ "${TPSU_COLOR:-}" == "1" ]]; then
-		printf '\033[%sm%s\033[0m' "$code" "$text"
-	else
-		printf '%s' "$text"
-	fi
+	printf '\033[%sm%s\033[0m' "$code" "$text"
 }
 
 print_outcome() {

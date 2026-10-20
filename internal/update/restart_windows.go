@@ -5,43 +5,21 @@ package update
 import (
 	"fmt"
 	"os"
-	"os/exec"
 
 	"github.com/Cimmerial/tps/internal/ui"
 )
 
-// RestartInteractive starts a fresh tps in this console and exits the current process.
+// RestartInteractive on Windows exits to the shell so the next `tps` starts with a clean console.
 func RestartInteractive(updated bool) error {
-	bin, argv, err := buildRestartArgv()
-	if err != nil {
-		return fmt.Errorf("locate tps: %w", err)
-	}
-	if updated {
-		argv = append(argv, flagUpdated)
-	} else {
-		argv = append(argv, flagUpToDate)
-	}
+	exitWindowsAfterUpdate(updated)
+	return nil
+}
 
-	args := argv[1:]
-	env := os.Environ()
-	if pairs := pendingWindowsReplacements(); len(pairs) > 0 {
-		p := pairs[0]
-		env = append(env, envStagedFrom+"="+p.Staging, envStagedTo+"="+p.Dest)
-		args = append(args, FlagApplyStaged)
-		clearWindowsReplaceQueue()
-	}
-
+func exitWindowsAfterUpdate(updated bool) {
 	ui.RestoreStdin()
 	fmt.Print("\r\n")
-
-	cmd := exec.Command(bin, args...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Env = env
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("restart tps: %w", err)
+	if updated {
+		fmt.Println(ui.Green("tps updated — run ") + ui.Cyan("tps") + ui.Green(" again to continue."))
 	}
 	os.Exit(0)
-	return nil
 }

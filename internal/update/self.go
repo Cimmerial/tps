@@ -154,8 +154,14 @@ func InstallAndRestart(root string) error {
 }
 
 func finishInstallAndRestart(updated bool) error {
-	if runtime.GOOS == "windows" && !updated {
-		fmt.Println(ui.Yellow("tps already up to date") + ui.Dim(" ("+version.Label()+")"))
+	if runtime.GOOS == "windows" {
+		if !updated {
+			fmt.Println(ui.Yellow("tps already up to date") + ui.Dim(" ("+version.Label()+")"))
+			return nil
+		}
+		if err := RestartInteractive(true); err != nil {
+			return err
+		}
 		return nil
 	}
 	if updated {
