@@ -39,6 +39,7 @@ const (
 	ActionInstallUtilities
 	ActionOpenInIDE
 	ActionVersion
+	ActionDoc
 )
 
 type MenuInput struct {
@@ -118,7 +119,7 @@ func printFullHelp(p *config.Project) {
 				cmdRow("quit", "q", "exit tps"),
 				cmdRow("project", "p · p1", "switch linked project (p1, p2, … or p name)"),
 				cmdRow("pb", "", "switch back to previous project"),
-				cmdRow("options", "o", "logo/color, terminal colors, capture sms, default IDE"),
+				cmdRow("options", "o", "logo/color, terminal colors, capture sms, default IDE, preferred browser"),
 				cmdRow("open in desired ide", "ide", "open this project in Cursor/VS Code (or your default IDE)"),
 				cmdRow("close all terms", "vite", "macOS: kill tab processes and close every Terminal.app window"),
 			},
@@ -166,6 +167,7 @@ func printFullHelp(p *config.Project) {
 			cmdRow("help", "h", "this list"),
 			cmdRow("version", "ver", "tps version (addon version when on an addon project)"),
 			cmdRow("install", "ih", "install & link repos on this or another machine"),
+			cmdRow("doc", "documentation", "open tps README on GitHub"),
 		},
 	})
 
@@ -262,6 +264,15 @@ func printTPSCommandHelp(sections []helpSection) {
 func isInstallHelpToken(tok string) bool {
 	switch strings.ToLower(tok) {
 	case "ih", "install", "install-help":
+		return true
+	default:
+		return false
+	}
+}
+
+func isDocToken(tok string) bool {
+	switch strings.ToLower(tok) {
+	case "doc", "documentation":
 		return true
 	default:
 		return false
@@ -393,6 +404,8 @@ func resolveMenuInput(cfg *config.Config, p *config.Project, line string) (MenuI
 		return MenuInput{Action: ActionHelp}, nil
 	case "ver", "version":
 		return MenuInput{Action: ActionVersion}, nil
+	case "doc", "documentation":
+		return MenuInput{Action: ActionDoc}, nil
 	case "clear":
 		return MenuInput{Action: ActionClear, ClearScrollback: true}, nil
 	case "tps":
@@ -469,13 +482,17 @@ func resolveMenuInput(cfg *config.Config, p *config.Project, line string) (MenuI
 		if isInstallHelpToken(fields[0]) {
 			return MenuInput{Action: ActionInstallHelp}, nil
 		}
+		if isDocToken(fields[0]) {
+			return MenuInput{Action: ActionDoc}, nil
+		}
 		if strings.EqualFold(fields[0], "u") || strings.EqualFold(fields[0], "update") {
 			return MenuInput{Action: ActionUpdate}, nil
 		}
 		if isNewCommandToken(fields[0]) || (len(fields) >= 2 && isNewCommandPhrase(fields[0], fields[1])) {
-			flagFields := fields[1:]
-			if len(fields) >= 2 && isNewCommandPhrase(fields[0], fields[1]) {
-				flagFields = fields[2:]
+			ncFields := splitInputFields(line)
+			flagFields := ncFields[1:]
+			if len(ncFields) >= 2 && isNewCommandPhrase(ncFields[0], ncFields[1]) {
+				flagFields = ncFields[2:]
 			}
 			cmd, err := parseNewCommandFlags(flagFields)
 			if err != nil {

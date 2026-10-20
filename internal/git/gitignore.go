@@ -5,6 +5,11 @@ import (
 	"strings"
 )
 
+// AppendGitignoreLines adds paths to dir/.gitignore when not already present.
+func AppendGitignoreLines(dir string, paths []string) error {
+	return appendGitignoreLines(dir, paths)
+}
+
 func appendGitignoreLines(dir string, paths []string) error {
 	if len(paths) == 0 {
 		return nil

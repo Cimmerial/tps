@@ -48,6 +48,30 @@ func TestSyncProjectCopiesReadme(t *testing.T) {
 	if string(got) != body {
 		t.Fatalf("got %q", got)
 	}
+	ignore, err := os.ReadFile(filepath.Join(app, ".gitignore"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(ignore) != "TPS.md\n" {
+		t.Fatalf(".gitignore %q", ignore)
+	}
+}
+
+func TestSyncProjectGitignoreWhenAlreadyPresent(t *testing.T) {
+	app := t.TempDir()
+	if err := os.WriteFile(filepath.Join(app, ".gitignore"), []byte("node_modules/\nTPS.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SyncProject("", app); err != nil {
+		t.Fatal(err)
+	}
+	ignore, err := os.ReadFile(filepath.Join(app, ".gitignore"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(ignore) != "node_modules/\nTPS.md\n" {
+		t.Fatalf(".gitignore %q", ignore)
+	}
 }
 
 func TestSyncAllLinked(t *testing.T) {

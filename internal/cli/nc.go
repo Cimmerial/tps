@@ -16,6 +16,15 @@ func isNewCommandPhrase(a, b string) bool {
 	return strings.EqualFold(a, "new") && strings.EqualFold(b, "command")
 }
 
+func isNCFlagToken(s string) bool {
+	switch s {
+	case "-precursor", "--precursor", "-tags", "--tags", "-t", "--terminal", "-capture", "-m", "-n", "-a", "-c":
+		return true
+	default:
+		return false
+	}
+}
+
 func parseNewCommandFlags(fields []string) (config.Command, error) {
 	var name, abbrev, shell, capture, tagsRaw, precursor string
 	detach := false
@@ -54,11 +63,16 @@ func parseNewCommandFlags(fields []string) (config.Command, error) {
 			}
 			abbrev = fields[i]
 		case "-c":
-			if i+1 >= len(fields) {
+			i++
+			if i >= len(fields) {
 				return config.Command{}, fmt.Errorf("nc: -c requires a shell command")
 			}
-			shell = strings.Join(fields[i+1:], " ")
-			i = len(fields)
+			start := i
+			for i < len(fields) && !isNCFlagToken(fields[i]) {
+				i++
+			}
+			shell = strings.Join(fields[start:i], " ")
+			i--
 		default:
 			return config.Command{}, fmt.Errorf("nc: unknown flag %q", fields[i])
 		}

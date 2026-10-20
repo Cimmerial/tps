@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/Cimmerial/tps/internal/config"
+	"github.com/Cimmerial/tps/internal/git"
 )
 
 // ReadmeRelSource is the canonical doc path in a tps dev clone (for editors).
@@ -64,14 +65,22 @@ func SyncProject(tpsRepo, projectRoot string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if len(data) == 0 {
-		return false, nil
+	wrote := false
+	if len(data) > 0 {
+		dst := filepath.Join(projectRoot, ReadmeDestName)
+		if err := os.WriteFile(dst, data, 0o644); err != nil {
+			return false, fmt.Errorf("write %s: %w", ReadmeDestName, err)
+		}
+		wrote = true
 	}
-	dst := filepath.Join(projectRoot, ReadmeDestName)
-	if err := os.WriteFile(dst, data, 0o644); err != nil {
-		return false, fmt.Errorf("write %s: %w", ReadmeDestName, err)
+	if err := ensureReadmeGitignored(projectRoot); err != nil {
+		return wrote, err
 	}
-	return true, nil
+	return wrote, nil
+}
+
+func ensureReadmeGitignored(projectRoot string) error {
+	return git.AppendGitignoreLines(projectRoot, []string{ReadmeDestName})
 }
 
 func SyncAllLinked(tpsRepo string, cfg *config.Config) (int, error) {

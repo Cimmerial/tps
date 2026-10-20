@@ -22,6 +22,13 @@ func DefaultDevProjectCommands() []config.Command {
 			Tags:        []string{"tps"},
 			Handler:     "sym",
 		},
+		{
+			Alias:       "push-release",
+			Abbrev:      "rel",
+			Description: "bump patch tag, push main + tag (GitHub release CI); rel -v0.2.0",
+			Tags:        []string{"tps"},
+			Shell:       "bash scripts/push-release.sh [INPUT1?]",
+		},
 	}
 }
 
@@ -34,6 +41,11 @@ func EnsureDefaultDevProjectCommands(p *config.Project) (bool, error) {
 	changed := pruneLegacyDevShellBuiltinCommands(p)
 	for _, def := range DefaultDevProjectCommands() {
 		if existing := p.FindCommand(def.Alias); existing != nil {
+			if def.Alias == "push-release" && strings.TrimSpace(def.Shell) != "" &&
+				existing.Shell == "bash scripts/push-release.sh [INPUT1]" {
+				existing.Shell = def.Shell
+				changed = true
+			}
 			if strings.TrimSpace(existing.Handler) == "" && strings.TrimSpace(def.Handler) != "" {
 				existing.Handler = def.Handler
 				if existing.Description == "" {

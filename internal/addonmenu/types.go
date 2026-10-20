@@ -27,7 +27,8 @@ type MenuAction struct {
 }
 
 type PickSpec struct {
-	Kind     string `yaml:"kind"` // file, files, folder
-	Prompt   string `yaml:"prompt"`
-	Optional bool   `yaml:"optional"`
+	Kind        string   `yaml:"kind"` // file, files, folder
+	Prompt      string   `yaml:"prompt"`
+	Optional    bool     `yaml:"optional"`
+	Extensions  []string `yaml:"extensions,omitempty"` // e.g. pdf — Finder filter + validation
 }

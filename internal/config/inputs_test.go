@@ -45,6 +45,27 @@ func TestValidateCommandInputs(t *testing.T) {
 	}
 }
 
+func TestOptionalShellInput(t *testing.T) {
+	c := &Command{
+		Alias: "rel",
+		Shell: "bash scripts/push-release.sh [INPUT1?]",
+	}
+	if err := ValidateCommandInputs(c, nil); err != nil {
+		t.Fatal(err)
+	}
+	got, err := c.ShellsWithInputs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got[0] != "bash scripts/push-release.sh " {
+		t.Fatalf("got %q", got[0])
+	}
+	got, err = c.ShellsWithInputs([]string{"v0.1.1"})
+	if err != nil || got[0] != "bash scripts/push-release.sh v0.1.1" {
+		t.Fatalf("got %v err %v", got, err)
+	}
+}
+
 func TestShellsWithInputs(t *testing.T) {
 	c := &Command{
 		Alias: "ic",

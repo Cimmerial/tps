@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"syscall"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -68,14 +67,6 @@ func writeFile(projectID string, f jobFile) error {
 		return err
 	}
 	return os.WriteFile(p, data, 0o600)
-}
-
-func alive(pid int) bool {
-	if pid <= 0 {
-		return false
-	}
-	err := syscall.Kill(pid, 0)
-	return err == nil
 }
 
 func Reap(projectID string) ([]Job, error) {

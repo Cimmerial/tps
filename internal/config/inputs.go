@@ -7,26 +7,37 @@ import (
 	"strings"
 )
 
-var shellInputPlaceholder = regexp.MustCompile(`\[INPUT(\d+)\]`)
+var shellInputPlaceholder = regexp.MustCompile(`\[INPUT(\d+)(\?)?\]`)
 
-// MaxShellInputIndex is the highest [INPUTn] index in the command's resolved shells (0 if none).
-func MaxShellInputIndex(c *Command) int {
+func shellInputBounds(c *Command) (requiredMax, acceptedMax int) {
 	if c == nil {
-		return 0
+		return 0, 0
 	}
-	max := 0
 	for _, line := range c.ResolvedShells() {
 		for _, m := range shellInputPlaceholder.FindAllStringSubmatch(line, -1) {
+			if len(m) < 2 {
+				continue
+			}
 			n, err := strconv.Atoi(m[1])
 			if err != nil || n < 1 {
 				continue
 			}
-			if n > max {
-				max = n
+			optional := len(m) >= 3 && m[2] == "?"
+			if n > acceptedMax {
+				acceptedMax = n
+			}
+			if !optional && n > requiredMax {
+				requiredMax = n
 			}
 		}
 	}
-	return max
+	return requiredMax, acceptedMax
+}
+
+// MaxShellInputIndex is the highest required [INPUTn] index (optional [INPUTn?] does not count).
+func MaxShellInputIndex(c *Command) int {
+	required, _ := shellInputBounds(c)
+	return required
 }
 
 // ParseShellInputTokens parses -value tokens after a command name on the interactive line.
@@ -53,18 +64,18 @@ func ValidateCommandInputs(c *Command, values []string) error {
 	if c == nil {
 		return fmt.Errorf("no command")
 	}
-	max := MaxShellInputIndex(c)
-	if max == 0 {
+	required, accepted := shellInputBounds(c)
+	if accepted == 0 {
 		if len(values) > 0 {
 			return fmt.Errorf("command %q does not accept inputs", c.Alias)
 		}
 		return nil
 	}
-	if len(values) < max {
-		return fmt.Errorf("command %q needs %d input(s) (use -value after the abbrev)", c.Alias, max)
+	if len(values) < required {
+		return fmt.Errorf("command %q needs %d input(s) (use -value after the abbrev)", c.Alias, required)
 	}
-	if len(values) > max {
-		return fmt.Errorf("command %q accepts at most %d input(s)", c.Alias, max)
+	if len(values) > accepted {
+		return fmt.Errorf("command %q accepts at most %d input(s)", c.Alias, accepted)
 	}
 	return nil
 }
@@ -92,8 +103,12 @@ func SubstituteShellInputs(shell string, values []string) (string, error) {
 		if err != nil || n < 1 {
 			return ph
 		}
+		optional := len(sub) >= 3 && sub[2] == "?"
 		if v, ok := m[n]; ok {
 			return v
+		}
+		if optional {
+			return ""
 		}
 		return ph
 	})

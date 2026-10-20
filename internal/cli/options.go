@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Cimmerial/tps/internal/browser"
 	"github.com/Cimmerial/tps/internal/config"
 	"github.com/Cimmerial/tps/internal/ide"
 	"github.com/Cimmerial/tps/internal/ui"
@@ -18,7 +19,8 @@ type prefSnapshot struct {
 	colorLabel     string
 	smsTo          string
 	smsShortcut    string
-	preferredIDE   string
+	preferredIDE     string
+	preferredBrowser string
 }
 
 func snapshotPreferences(p *config.Preferences) prefSnapshot {
@@ -29,7 +31,8 @@ func snapshotPreferences(p *config.Preferences) prefSnapshot {
 		colorLabel:     colorPrefLabel(p.ColorEnabled),
 		smsTo:          strings.TrimSpace(p.SMSTo),
 		smsShortcut:    strings.TrimSpace(p.SMSShortcut),
-		preferredIDE:   string(ide.NormalizeID(p.PreferredIDE)),
+		preferredIDE:     string(ide.NormalizeID(p.PreferredIDE)),
+		preferredBrowser: string(browser.NormalizeID(p.PreferredBrowser)),
 	}
 }
 
@@ -59,6 +62,9 @@ func optionsSessionChanges(before, after prefSnapshot) []string {
 	}
 	if before.preferredIDE != after.preferredIDE {
 		lines = append(lines, formatPrefChange("default IDE", optionsPreferredIDELabel(ide.ID(before.preferredIDE)), optionsPreferredIDELabel(ide.ID(after.preferredIDE))))
+	}
+	if before.preferredBrowser != after.preferredBrowser {
+		lines = append(lines, formatPrefChange("preferred browser", optionsPreferredBrowserLabel(browser.ID(before.preferredBrowser)), optionsPreferredBrowserLabel(browser.ID(after.preferredBrowser))))
 	}
 	return lines
 }
@@ -114,6 +120,7 @@ func runOptionsMenu(projectID string, statusTick int) error {
 			{Num: "3", Desc: ui.Dim("terminal colors")},
 			{Num: "4", Desc: optionsCaptureSMSRowDesc(prefs)},
 			{Num: "5", Desc: optionsPreferredIDERowDesc(prefs)},
+			{Num: "6", Desc: optionsPreferredBrowserRowDesc(prefs)},
 		})
 		fmt.Println()
 		printNumberedMenuRows([]numberedMenuRow{
@@ -162,6 +169,14 @@ func runOptionsMenu(projectID string, statusTick int) error {
 			}
 		case 5:
 			changed, err := optionsPreferredIDEMenu(prefs, projectID, statusTick)
+			if err != nil {
+				return err
+			}
+			if changed {
+				continue
+			}
+		case 6:
+			changed, err := optionsPreferredBrowserMenu(prefs, projectID, statusTick)
 			if err != nil {
 				return err
 			}

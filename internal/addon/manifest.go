@@ -72,6 +72,14 @@ func MergeManifestCommands(p *config.Project) error {
 	return nil
 }
 
+// SyncManifestCommands merges tps-addon.yaml commands when projectRoot is an addon repo.
+func SyncManifestCommands(p *config.Project) error {
+	if p == nil || !IsAddonProject(p.Path) {
+		return nil
+	}
+	return MergeManifestCommands(p)
+}
+
 func DefaultUtilitiesManifest() Manifest {
 	return Manifest{
 		ID:                UtilitiesID,
@@ -85,6 +93,12 @@ func DefaultUtilitiesManifest() Manifest {
 				Abbrev:      "uic",
 				Description: "convert images via PNG hub (JPEG, PNG, GIF, …)",
 				Menu:        "menus/uic.yaml",
+			},
+			{
+				Alias:       "universal pdf tool",
+				Abbrev:      "upt",
+				Description: "split or combine PDFs",
+				Menu:        "menus/upt.yaml",
 			},
 		},
 	}

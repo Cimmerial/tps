@@ -22,9 +22,12 @@ var setupPath string
 var setupCmd = &cobra.Command{
 	Use:   "setup",
 	Short: "Install/update tps and link a project (run from the app repo)",
-	Long:  "Install or update tps from your linked dev repo when present, ensure Go bin is on PATH in ~/.zshrc, link the project, and refresh TPS.md.",
+	Long:  "Install or update tps from your linked dev repo when present, ensure Go bin is on PATH in ~/.zshrc, link the project, refresh TPS.md, and add TPS.md to .gitignore.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return runSetup(setupName, setupPath)
+		if err := runSetup(setupName, setupPath); err != nil {
+			return err
+		}
+		return runInteractive()
 	},
 }
 
@@ -98,7 +101,6 @@ func runSetup(nameOverride, pathOverride string) error {
 	if linked.GitRemote != "" {
 		fmt.Printf("%s %s\n", ui.Dim("remote:"), linked.GitRemote)
 	}
-	fmt.Println(ui.Dim("run: tps"))
 	return nil
 }
 

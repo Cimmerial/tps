@@ -13,6 +13,16 @@ import (
 	"github.com/Cimmerial/tps/internal/ui"
 )
 
+func syncAddonManifest(cfg *config.Config, p *config.Project) error {
+	if cfg == nil || p == nil {
+		return nil
+	}
+	if err := addon.SyncManifestCommands(p); err != nil {
+		return err
+	}
+	return config.Save(cfg)
+}
+
 func printAddonsHelpSection() {
 	fmt.Println()
 	fmt.Printf("%s\n", ui.Header("TPS ADDONS"))

@@ -24,7 +24,8 @@ func executeProjectCommand(p *config.Project, alias string, inputs []string) (in
 			return 1, false, fmt.Errorf("command %q uses a menu; run it without -inputs", alias)
 		}
 		code, err := addonmenu.RunCommandMenu(p, cmd)
-		return code, false, err
+		// Leave scrollback (tpsu output) visible; do not redraw logo/header.
+		return code, true, err
 	}
 	chain, err := p.CommandRunChain(alias)
 	if err != nil {

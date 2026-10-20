@@ -78,6 +78,9 @@ func runInteractive() error {
 	if err := ensureDevProjectCommands(cfg, selected); err != nil {
 		return err
 	}
+	if err := syncAddonManifest(cfg, selected); err != nil {
+		return err
+	}
 	if restartBanner == "" {
 		if root := devRepoRoot(cfg, selected); root != "" {
 			spin := ui.NewSpinner("checking for updates")
@@ -143,6 +146,12 @@ func runInteractive() error {
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
 			printInstallHelp()
+		case ActionDoc:
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
+			if err := runOpenDocs(); err != nil {
+				fmt.Fprintf(os.Stderr, "doc: %v\n", err)
+			}
 		case ActionClear:
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
@@ -176,6 +185,11 @@ func runInteractive() error {
 				} else if err := buildUtilitiesBinary(selected.Path); err != nil {
 					fmt.Fprintf(os.Stderr, "%s\n", ui.Yellow("addon build: "+err.Error()))
 				} else {
+					if err := syncAddonManifest(cfg, selected); err != nil {
+						fmt.Fprintf(os.Stderr, "%s\n", ui.Yellow("addon manifest: "+err.Error()))
+					} else if err := config.Save(cfg); err != nil {
+						fmt.Fprintf(os.Stderr, "config: %v\n", err)
+					}
 					fmt.Println(ui.Green("addon updated"))
 				}
 			}
@@ -307,7 +321,7 @@ func runInteractive() error {
 				fmt.Fprintf(os.Stderr, "command exited with code %d\n", code)
 				continue
 			}
-			if hadMenu {
+			if hadMenu && !compactPrompt {
 				if err := refreshInteractiveSession(projectID, statusTick, "", false); err != nil {
 					return err
 				}

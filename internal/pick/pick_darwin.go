@@ -11,28 +11,52 @@ import (
 	"github.com/Cimmerial/tps/internal/ui"
 )
 
-func ChooseFile(prompt string) (string, error) {
-	path, err := chooseFileOSA(prompt)
+func ChooseFile(prompt string, filter FileFilter) (string, error) {
+	path, err := chooseFileOSA(prompt, filter)
 	if err == nil {
+		if err := filter.Validate(path); err != nil {
+			return "", err
+		}
 		return path, nil
 	}
 	if err == ErrCancelled {
 		return "", err
 	}
 	printOSAFallback(err)
-	return readPathLine(prompt)
+	path, err = readPathLine(prompt)
+	if err != nil {
+		return "", err
+	}
+	if err := filter.Validate(path); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
-func ChooseFiles(prompt string) ([]string, error) {
-	paths, err := chooseFilesOSA(prompt)
+func ChooseFiles(prompt string, filter FileFilter) ([]string, error) {
+	paths, err := chooseFilesOSA(prompt, filter)
 	if err == nil {
+		for _, path := range paths {
+			if err := filter.Validate(path); err != nil {
+				return nil, err
+			}
+		}
 		return paths, nil
 	}
 	if err == ErrCancelled {
 		return nil, err
 	}
 	printOSAFallback(err)
-	return readPathsLine(prompt)
+	paths, err = readPathsLine(prompt)
+	if err != nil {
+		return nil, err
+	}
+	for _, path := range paths {
+		if err := filter.Validate(path); err != nil {
+			return nil, err
+		}
+	}
+	return paths, nil
 }
 
 func ChooseFolder(prompt string) (string, error) {
@@ -53,10 +77,11 @@ func printOSAFallback(err error) {
 	fmt.Fprintf(os.Stderr, "%s\n", ui.Dim("(Cursor’s terminal often blocks AppleScript — System Settings → Privacy & Security → Automation.)"))
 }
 
-func chooseFilesOSA(prompt string) ([]string, error) {
+func chooseFilesOSA(prompt string, filter FileFilter) ([]string, error) {
 	prompt = escapeAppleScript(prompt)
+	typeSuffix := applescriptTypeSuffix(filter.Extensions)
 	lines := []string{
-		fmt.Sprintf(`set theFiles to choose file with prompt "%s" with multiple selections allowed`, prompt),
+		fmt.Sprintf(`set theFiles to choose file with prompt "%s" with multiple selections allowed%s`, prompt, typeSuffix),
 		`set out to ""`,
 		`repeat with f in theFiles`,
 		`set out to out & (POSIX path of f) & linefeed`,
@@ -81,9 +106,10 @@ func chooseFilesOSA(prompt string) ([]string, error) {
 	return paths, nil
 }
 
-func chooseFileOSA(prompt string) (string, error) {
+func chooseFileOSA(prompt string, filter FileFilter) (string, error) {
 	prompt = escapeAppleScript(prompt)
-	return runOSA([]string{fmt.Sprintf(`POSIX path of (choose file with prompt "%s")`, prompt)})
+	typeSuffix := applescriptTypeSuffix(filter.Extensions)
+	return runOSA([]string{fmt.Sprintf(`POSIX path of (choose file with prompt "%s"%s)`, prompt, typeSuffix)})
 }
 
 func chooseFolderOSA(prompt string) (string, error) {

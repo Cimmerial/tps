@@ -102,11 +102,14 @@ func RunCommandMenu(p *config.Project, cmd *config.Command) (int, error) {
 			continue
 		}
 		if item.Action != nil {
-			code, _, err := runAction(p, item.Action)
+			code, ran, err := runAction(p, item.Action)
 			if err != nil {
 				return code, err
 			}
-			if code != 0 {
+			if ran && code == 0 {
+				return 0, nil
+			}
+			if ran && code != 0 {
 				fmt.Fprintf(os.Stderr, "command exited with code %d\n", code)
 			}
 			continue
@@ -162,26 +165,26 @@ func printActionSummary(lines []string) {
 	fmt.Println()
 }
 
-func runAction(p *config.Project, action *MenuAction) (int, []string, error) {
+func runAction(p *config.Project, action *MenuAction) (int, bool, error) {
 	picks, err := collectPicks(action.Picks)
 	if err != nil {
 		if err == pick.ErrCancelled {
 			fmt.Println(ui.Dim("picker cancelled"))
-			return 0, nil, nil
+			return 0, false, nil
 		}
 		fmt.Printf("%s\n", ui.Yellow(err.Error()))
-		return 0, nil, nil
+		return 0, false, nil
 	}
 	shell := expandShell(p.Path, action.Shell, picks)
 	if strings.Contains(action.Shell, "bin/tpsu") {
 		bin := filepath.Join(p.Path, "bin", "tpsu")
 		if _, err := os.Stat(bin); err != nil {
 			fmt.Printf("%s\n", ui.Yellow("missing bin/tpsu — in the addon repo run: go build -o bin/tpsu ./cmd/tpsu"))
-			return 1, nil, nil
+			return 1, true, nil
 		}
 	}
 	code, err := runner.RunScript(p, shell)
-	return code, nil, err
+	return code, true, err
 }
 
 func collectPicks(specs []PickSpec) ([]string, error) {
@@ -191,17 +194,26 @@ func collectPicks(specs []PickSpec) ([]string, error) {
 		if prompt == "" {
 			prompt = "Choose"
 		}
+		filter := pick.FileFilter{Extensions: spec.Extensions}
 		switch strings.ToLower(strings.TrimSpace(spec.Kind)) {
 		case "file":
-			path, err := pick.ChooseFile(prompt)
+			path, err := pick.ChooseFile(prompt, filter)
 			if err != nil {
+				return nil, err
+			}
+			if err := filter.Validate(path); err != nil {
 				return nil, err
 			}
 			out = append(out, path)
 		case "files":
-			paths, err := pick.ChooseFiles(prompt)
+			paths, err := pick.ChooseFiles(prompt, filter)
 			if err != nil {
 				return nil, err
+			}
+			for _, path := range paths {
+				if err := filter.Validate(path); err != nil {
+					return nil, err
+				}
 			}
 			out = append(out, strings.Join(paths, "\n"))
 		case "folder":

@@ -104,6 +104,15 @@ func TestResolveMenuInputCommandWithShellInputs(t *testing.T) {
 	}
 }
 
+func TestResolveMenuInputDoc(t *testing.T) {
+	for _, line := range []string{"doc", "documentation", "DOC"} {
+		in, err := resolveMenuInput(nil, &config.Project{}, line)
+		if err != nil || in.Action != ActionDoc {
+			t.Fatalf("%q: %+v err=%v", line, in, err)
+		}
+	}
+}
+
 func TestResolveMenuInputInstallUtilities(t *testing.T) {
 	in, err := resolveMenuInput(nil, &config.Project{}, "iu")
 	if err != nil || in.Action != ActionInstallUtilities {
