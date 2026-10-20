@@ -24,7 +24,8 @@ func ApplyStagedWindowsBinaryIfNeeded() error {
 	time.Sleep(350 * time.Millisecond)
 	var lastErr error
 	for i := 0; i < 25; i++ {
-		if err := os.Rename(from, to); err == nil {
+		err := os.Rename(from, to)
+		if err == nil {
 			_ = os.Unsetenv(envStagedFrom)
 			_ = os.Unsetenv(envStagedTo)
 			return nil
