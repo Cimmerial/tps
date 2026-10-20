@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/Cimmerial/tps/internal/config"
+	"github.com/Cimmerial/tps/internal/ui"
 )
 
 // RunCommand runs the project alias. It returns the child exit code (0 on success).
@@ -40,14 +41,27 @@ func RunScriptCaptureStderr(p *config.Project, script string) (int, string, erro
 	c.Dir = p.Path
 	c.Env = scriptEnviron(p)
 	c.Stdin = os.Stdin
-	c.Stdout = os.Stdout
 	var buf bytes.Buffer
-	c.Stderr = io.MultiWriter(os.Stderr, &buf)
+	if ui.SimplifiedOutput() {
+		c.Stdout = &buf
+		c.Stderr = &buf
+	} else {
+		c.Stdout = os.Stdout
+		c.Stderr = io.MultiWriter(os.Stderr, &buf)
+	}
 	if err := c.Run(); err != nil {
 		if exit, ok := err.(*exec.ExitError); ok {
+			if ui.SimplifiedOutput() {
+				_, _ = os.Stdout.Write(buf.Bytes())
+			}
 			return exit.ExitCode(), buf.String(), nil
 		}
 		return 1, buf.String(), err
+	}
+	if ui.SimplifiedOutput() {
+		if line := summarizeSuccessOutput(script, buf.String()); line != "" {
+			fmt.Println(line)
+		}
 	}
 	return 0, buf.String(), nil
 }

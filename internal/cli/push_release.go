@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Cimmerial/tps/internal/config"
+	"github.com/Cimmerial/tps/internal/ui"
 )
 
 func runPushRelease(p *config.Project, inputs []string) (int, error) {
@@ -42,6 +43,9 @@ func runPushRelease(p *config.Project, inputs []string) (int, error) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
+	if ui.SimplifiedOutput() {
+		cmd.Env = append(os.Environ(), "TPS_SIMPLIFIED_OUTPUT=1")
+	}
 	if err := cmd.Run(); err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
 			return ee.ExitCode(), nil

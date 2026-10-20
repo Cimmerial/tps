@@ -21,6 +21,7 @@ type Preferences struct {
 	SessionProjectID   string `yaml:"session_project_id,omitempty"`    // interactive session project (survives switch / restart)
 	PreferredIDE       string `yaml:"preferred_ide,omitempty"`         // cursor, vscode, auto, …
 	PreferredBrowser   string `yaml:"preferred_browser,omitempty"`     // default, chrome, firefox, …
+	SimplifiedOutput   bool   `yaml:"simplified_output,omitempty"`     // summarize git/tests/scripts (default verbose)
 }
 
 func PreferencesPath() (string, error) {

@@ -28,7 +28,10 @@ func RestartInteractive(updated bool) error {
 		return err
 	}
 
-	cmd := exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script)
+	cmd := exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start updater: %w", err)
 	}
@@ -57,11 +60,12 @@ func writeWindowsRestartScript(parent int, bin string, argv []string) (string, e
 		argParts = append(argParts, psLiteral(a))
 	}
 	if len(argParts) == 0 {
-		b.WriteString("Start-Process -FilePath $bin -NoNewWindow\n")
+		b.WriteString("& $bin\n")
 	} else {
-		b.WriteString(fmt.Sprintf("$args = @(%s)\n", strings.Join(argParts, ", ")))
-		b.WriteString("Start-Process -FilePath $bin -ArgumentList $args -NoNewWindow\n")
+		b.WriteString(fmt.Sprintf("$tpsArgs = @(%s)\n", strings.Join(argParts, ", ")))
+		b.WriteString("& $bin @tpsArgs\n")
 	}
+	b.WriteString("exit $LASTEXITCODE\n")
 
 	if err := os.WriteFile(script, []byte(b.String()), 0o600); err != nil {
 		return "", err

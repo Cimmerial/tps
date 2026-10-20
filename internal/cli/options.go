@@ -20,8 +20,9 @@ type prefSnapshot struct {
 	colorLabel     string
 	smsTo          string
 	smsShortcut    string
-	preferredIDE     string
-	preferredBrowser string
+	preferredIDE       string
+	preferredBrowser   string
+	simplifiedOutput   bool
 }
 
 func snapshotPreferences(p *config.Preferences) prefSnapshot {
@@ -32,8 +33,9 @@ func snapshotPreferences(p *config.Preferences) prefSnapshot {
 		colorLabel:     colorPrefLabel(p.ColorEnabled),
 		smsTo:          strings.TrimSpace(p.SMSTo),
 		smsShortcut:    strings.TrimSpace(p.SMSShortcut),
-		preferredIDE:     string(ide.NormalizeID(p.PreferredIDE)),
-		preferredBrowser: string(browser.NormalizeID(p.PreferredBrowser)),
+		preferredIDE:       string(ide.NormalizeID(p.PreferredIDE)),
+		preferredBrowser:   string(browser.NormalizeID(p.PreferredBrowser)),
+		simplifiedOutput:   p.SimplifiedOutput,
 	}
 }
 
@@ -66,6 +68,9 @@ func optionsSessionChanges(before, after prefSnapshot) []string {
 	}
 	if before.preferredBrowser != after.preferredBrowser {
 		lines = append(lines, formatPrefChange("preferred browser", optionsPreferredBrowserLabel(browser.ID(before.preferredBrowser)), optionsPreferredBrowserLabel(browser.ID(after.preferredBrowser))))
+	}
+	if before.simplifiedOutput != after.simplifiedOutput {
+		lines = append(lines, formatPrefChange("command output", outputModeLabel(before.simplifiedOutput), outputModeLabel(after.simplifiedOutput)))
 	}
 	return lines
 }
@@ -102,9 +107,10 @@ func optionsTopMenuRows(prefs *config.Preferences) []numberedMenuRow {
 		{Num: "1", Desc: ui.Dim("title card logo")},
 		{Num: "2", Desc: ui.Dim("title card color")},
 		{Num: "3", Desc: ui.Dim("terminal colors")},
+		{Num: "4", Desc: optionsOutputRowDesc(prefs)},
 	}
 	if platform.SupportsCaptureSMS() {
-		rows = append(rows, numberedMenuRow{Num: "4", Desc: optionsCaptureSMSRowDesc(prefs)})
+		rows = append(rows, numberedMenuRow{Num: "5", Desc: optionsCaptureSMSRowDesc(prefs)})
 	}
 	n := len(rows) + 1
 	rows = append(rows,
@@ -128,6 +134,11 @@ func runOptionsTopMenuChoice(choice int, prefs *config.Preferences, projectID st
 	n++
 	if choice == n {
 		changed, err = optionsColorsMenu(prefs, projectID, statusTick)
+		return true, changed, err
+	}
+	n++
+	if choice == n {
+		changed, err = optionsOutputMenu(prefs, projectID, statusTick)
 		return true, changed, err
 	}
 	n++

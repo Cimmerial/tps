@@ -8,11 +8,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/Cimmerial/tps/internal/config"
 	"github.com/Cimmerial/tps/internal/instance"
 	"github.com/Cimmerial/tps/internal/ui"
+	"github.com/Cimmerial/tps/internal/version"
 )
 
 type InstallResult struct {
@@ -118,10 +120,7 @@ func InstallAndRestart(root string) error {
 		}
 		updated := result.Updated || len(synced) > 0
 		syncInstanceReadmes("")
-		if err := RestartInteractive(updated); err != nil {
-			return fmt.Errorf("restart failed: %w (run tps again)", err)
-		}
-		return nil
+		return finishInstallAndRestart(updated)
 	}
 
 	if err := PullFastForward(root); err != nil {
@@ -151,6 +150,17 @@ func InstallAndRestart(root string) error {
 
 	updated := result.Updated || len(synced) > 0
 	syncInstanceReadmes(root)
+	return finishInstallAndRestart(updated)
+}
+
+func finishInstallAndRestart(updated bool) error {
+	if runtime.GOOS == "windows" && !updated {
+		fmt.Println(ui.Yellow("tps already up to date") + ui.Dim(" ("+version.Label()+")"))
+		return nil
+	}
+	if updated {
+		fmt.Println(ui.Green("tps updated — restarting…"))
+	}
 	if err := RestartInteractive(updated); err != nil {
 		return fmt.Errorf("restart failed: %w (run tps again)", err)
 	}

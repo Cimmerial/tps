@@ -11,10 +11,11 @@ func applyUIPreferences() error {
 		return err
 	}
 	ui.ApplySettings(ui.UISettings{
-		LogoID:         prefs.LogoID(),
-		TitleCardColor: prefs.TitleCardColorMode(),
-		Accent:         prefs.AccentMode(),
-		ColorEnabled:   prefs.ColorEnabled,
+		LogoID:           prefs.LogoID(),
+		TitleCardColor:   prefs.TitleCardColorMode(),
+		Accent:           prefs.AccentMode(),
+		ColorEnabled:     prefs.ColorEnabled,
+		SimplifiedOutput: prefs.SimplifiedOutput,
 	})
 	return nil
 }

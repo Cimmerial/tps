@@ -42,6 +42,9 @@ func scriptEnviron(p *config.Project) []string {
 	if ui.ColorEnabled() {
 		env = append(env, "TPSU_COLOR=1")
 	}
+	if ui.SimplifiedOutput() {
+		env = append(env, "TPS_SIMPLIFIED_OUTPUT=1")
+	}
 	return env
 }
 

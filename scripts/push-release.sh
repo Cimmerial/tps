@@ -27,6 +27,18 @@ die() {
 	exit 1
 }
 
+simplified_output() {
+	[[ "${TPS_SIMPLIFIED_OUTPUT:-}" == "1" ]]
+}
+
+git_quiet() {
+	if simplified_output; then
+		git -q "$@"
+	else
+		git "$@"
+	fi
+}
+
 yes=false
 dry_run=false
 explicit=""
@@ -133,18 +145,53 @@ fi
 
 bump_dev_version "$semver"
 
-echo "running tests..."
-go test ./...
+if simplified_output; then
+	echo "running tests..."
+	if test_out="$(go test ./... 2>&1)"; then
+		ok_count=0
+		skip_count=0
+		while IFS= read -r line; do
+			case "$line" in
+			ok\ *) ok_count=$((ok_count + 1)) ;;
+			?\ *) skip_count=$((skip_count + 1)) ;;
+			esac
+		done <<<"$test_out"
+		if [[ "$ok_count" -gt 0 && "$skip_count" -gt 0 ]]; then
+			echo "tests ok ($ok_count packages, $skip_count without tests)"
+		elif [[ "$skip_count" -gt 0 ]]; then
+			echo "tests ok ($skip_count packages without tests)"
+		elif [[ "$ok_count" -gt 0 ]]; then
+			echo "tests ok ($ok_count packages)"
+		else
+			echo "tests ok"
+		fi
+	else
+		echo "$test_out"
+		exit 1
+	fi
+else
+	echo "running tests..."
+	go test ./...
+fi
 
 if ! git diff --quiet -- "$VERSION_FILE"; then
 	git add "$VERSION_FILE"
-	git commit -m "release $tag"
+	if simplified_output; then
+		git_quiet commit -m "release $tag"
+	else
+		git commit -m "release $tag"
+	fi
 fi
 
 git tag -a "$tag" -m "release $tag"
 
-git push "$REMOTE" "$BRANCH"
-git push "$REMOTE" "$tag"
+if simplified_output; then
+	git_quiet push "$REMOTE" "$BRANCH"
+	git_quiet push "$REMOTE" "$tag"
+else
+	git push "$REMOTE" "$BRANCH"
+	git push "$REMOTE" "$tag"
+fi
 
 echo
 echo "Pushed $tag. Watch GitHub Actions → release, then users can re-run install.ps1 / install.sh."

@@ -7,10 +7,11 @@ import (
 
 // UISettings holds runtime theme preferences applied from config.
 type UISettings struct {
-	LogoID          string
-	TitleCardColor  string // config.ColorPresets id (logo only)
-	Accent          string // config.ColorPresets id
-	ColorEnabled    *bool
+	LogoID           string
+	TitleCardColor   string // config.ColorPresets id (logo only)
+	Accent           string // config.ColorPresets id
+	ColorEnabled     *bool
+	SimplifiedOutput bool
 }
 
 var current UISettings

@@ -50,11 +50,17 @@ func InstallFromGitHubRelease() (InstallResult, error) {
 		return InstallResult{}, err
 	}
 
+	clearWindowsReplaceQueue()
 	dest, err := exec.LookPath("tps")
 	if err != nil {
 		dest, err = os.Executable()
 		if err != nil {
 			return InstallResult{}, fmt.Errorf("locate tps binary: %w", err)
+		}
+	}
+	if runtime.GOOS == "windows" {
+		if exe, err := os.Executable(); err == nil {
+			dest = exe
 		}
 	}
 	dest, err = filepath.EvalSymlinks(dest)
