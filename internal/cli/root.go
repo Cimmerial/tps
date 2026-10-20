@@ -5,6 +5,7 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/Cimmerial/tps/internal/ui"
 	"github.com/Cimmerial/tps/internal/update"
 	"github.com/spf13/cobra"
 )
@@ -23,8 +24,11 @@ var rootCmd = &cobra.Command{
 // Execute is called from main.
 func Execute() error {
 	if runtime.GOOS == "windows" {
-		if err := update.ApplyStagedWindowsBinaryIfNeeded(); err != nil {
+		needReload, err := update.ApplyStagedWindowsBinaryIfNeeded()
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "update: %v\n", err)
+		} else if needReload {
+			fmt.Fprintf(os.Stderr, "%s\n", ui.Yellow("update installed on disk — run tps again to load the new version."))
 		}
 	}
 	sessionRestartBanner = peelRestartFlagsFromArgv()

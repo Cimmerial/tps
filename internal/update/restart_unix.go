@@ -9,7 +9,7 @@ import (
 )
 
 // RestartInteractive replaces this process with a fresh tps invocation (same args).
-func RestartInteractive(updated bool) error {
+func RestartInteractive(updated bool, _ string) error {
 	bin, argv, err := buildRestartArgv()
 	if err != nil {
 		return fmt.Errorf("locate tps: %w", err)

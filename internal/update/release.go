@@ -78,7 +78,11 @@ func InstallFromGitHubRelease() (InstallResult, error) {
 	if before == "" && after != "" {
 		updated = true
 	}
-	return InstallResult{Updated: updated}, nil
+	tagLabel := tag
+	if !strings.HasPrefix(tagLabel, "v") {
+		tagLabel = "v" + tagLabel
+	}
+	return InstallResult{Updated: updated, Version: tagLabel}, nil
 }
 
 func latestReleaseTag() (string, error) {

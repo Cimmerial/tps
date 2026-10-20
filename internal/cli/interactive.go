@@ -331,7 +331,7 @@ func runInteractive() error {
 				fmt.Fprintf(os.Stderr, "could not save usage: %v\n", err)
 			}
 			if strings.EqualFold(input.Alias, "update") && devRepoRoot(cfg, selected) != "" {
-				if err := update.RestartInteractive(true); err != nil {
+				if err := update.RestartInteractive(true, ""); err != nil {
 					fmt.Fprintf(os.Stderr, "restart: %v\n", err)
 				}
 			}

@@ -19,6 +19,7 @@ import (
 
 type InstallResult struct {
 	Updated bool
+	Version string // release tag (vX.Y.Z) when installing from GitHub
 }
 
 func InstallFromProjectRoot(root string) (InstallResult, error) {
@@ -77,7 +78,7 @@ func MaybeAutoUpdate(root string) error {
 		return nil
 	}
 	syncInstanceReadmes(root)
-	if err := RestartInteractive(true); err != nil {
+	if err := RestartInteractive(true, version.Label()); err != nil {
 		return fmt.Errorf("restart failed: %w (run tps again)", err)
 	}
 	return nil
@@ -120,7 +121,7 @@ func InstallAndRestart(root string) error {
 		}
 		updated := result.Updated || len(synced) > 0
 		syncInstanceReadmes("")
-		return finishInstallAndRestart(updated)
+		return finishInstallAndRestart(updated, result.Version)
 	}
 
 	if err := PullFastForward(root); err != nil {
@@ -150,16 +151,20 @@ func InstallAndRestart(root string) error {
 
 	updated := result.Updated || len(synced) > 0
 	syncInstanceReadmes(root)
-	return finishInstallAndRestart(updated)
+	ver := result.Version
+	if ver == "" {
+		ver = version.Label()
+	}
+	return finishInstallAndRestart(updated, ver)
 }
 
-func finishInstallAndRestart(updated bool) error {
+func finishInstallAndRestart(updated bool, installedVersion string) error {
 	if runtime.GOOS == "windows" {
 		if !updated {
 			fmt.Println(ui.Yellow("tps already up to date") + ui.Dim(" ("+version.Label()+")"))
 			return nil
 		}
-		if err := RestartInteractive(true); err != nil {
+		if err := RestartInteractive(true, installedVersion); err != nil {
 			return err
 		}
 		return nil
@@ -167,7 +172,7 @@ func finishInstallAndRestart(updated bool) error {
 	if updated {
 		fmt.Println(ui.Green("tps updated — restarting…"))
 	}
-	if err := RestartInteractive(updated); err != nil {
+	if err := RestartInteractive(updated, installedVersion); err != nil {
 		return fmt.Errorf("restart failed: %w (run tps again)", err)
 	}
 	return nil
