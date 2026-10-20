@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Cimmerial/tps/internal/config"
+	"github.com/Cimmerial/tps/internal/instance"
 	"github.com/Cimmerial/tps/internal/jobs"
 	"github.com/Cimmerial/tps/internal/ui"
 )
@@ -522,8 +523,10 @@ func resolveMenuInput(cfg *config.Config, p *config.Project, line string) (MenuI
 			if err != nil {
 				return MenuInput{}, err
 			}
-			if err := config.ValidateCommandInputs(cmd, inputs); err != nil {
-				return MenuInput{}, err
+			if !instance.IsBuiltinDevCommand(p, cmd.Alias) {
+				if err := config.ValidateCommandInputs(cmd, inputs); err != nil {
+					return MenuInput{}, err
+				}
 			}
 			return MenuInput{Action: ActionRun, Alias: cmd.Alias, ShellInputs: inputs}, nil
 		}

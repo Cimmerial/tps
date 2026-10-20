@@ -25,9 +25,9 @@ func DefaultDevProjectCommands() []config.Command {
 		{
 			Alias:       "push-release",
 			Abbrev:      "rel",
-			Description: "bump patch tag, push main + tag (GitHub release CI); rel -v0.2.0",
+			Description: "commit first, then tag + push (CI release); rel -v0.2.0 -y",
 			Tags:        []string{"tps"},
-			Shell:       "bash scripts/push-release.sh [INPUT1?]",
+			Handler:     "push-release",
 		},
 	}
 }
@@ -41,9 +41,7 @@ func EnsureDefaultDevProjectCommands(p *config.Project) (bool, error) {
 	changed := pruneLegacyDevShellBuiltinCommands(p)
 	for _, def := range DefaultDevProjectCommands() {
 		if existing := p.FindCommand(def.Alias); existing != nil {
-			if def.Alias == "push-release" && strings.TrimSpace(def.Shell) != "" &&
-				existing.Shell == "bash scripts/push-release.sh [INPUT1]" {
-				existing.Shell = def.Shell
+			if c := syncDevProjectCommand(existing, def); c {
 				changed = true
 			}
 			if strings.TrimSpace(existing.Handler) == "" && strings.TrimSpace(def.Handler) != "" {
@@ -68,6 +66,48 @@ func EnsureDefaultDevProjectCommands(p *config.Project) (bool, error) {
 		changed = true
 	}
 	return changed, nil
+}
+
+func syncDevProjectCommand(existing *config.Command, def config.Command) bool {
+	if existing == nil {
+		return false
+	}
+	changed := false
+	if strings.TrimSpace(def.Handler) != "" {
+		if existing.Handler != def.Handler {
+			existing.Handler = def.Handler
+			changed = true
+		}
+		if existing.Shell != "" {
+			existing.Shell = ""
+			changed = true
+		}
+	}
+	if def.Abbrev != "" && existing.Abbrev != def.Abbrev {
+		existing.Abbrev = def.Abbrev
+		changed = true
+	}
+	if def.Description != "" && existing.Description != def.Description {
+		existing.Description = def.Description
+		changed = true
+	}
+	if len(def.Tags) > 0 && !sameStringSlice(existing.Tags, def.Tags) {
+		existing.Tags = append([]string(nil), def.Tags...)
+		changed = true
+	}
+	return changed
+}
+
+func sameStringSlice(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func pruneLegacyDevShellBuiltinCommands(p *config.Project) bool {

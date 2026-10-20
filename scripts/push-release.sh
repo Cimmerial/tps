@@ -65,7 +65,7 @@ if [[ "$branch" != "$BRANCH" ]]; then
 fi
 
 if ! git diff --quiet || ! git diff --cached --quiet; then
-	die "working tree not clean — commit or stash before releasing"
+	die "commit or stash all changes before releasing (git status is not clean)"
 fi
 
 git fetch "$REMOTE" --tags

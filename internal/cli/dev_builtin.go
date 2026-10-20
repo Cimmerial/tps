@@ -35,6 +35,9 @@ func runDevBuiltin(p *config.Project, alias string, inputs []string) (bool, int,
 	case "sym":
 		printSymbolCatalog(p.Path, inputs)
 		return true, 0, nil
+	case "push-release":
+		code, err := runPushRelease(p, inputs)
+		return true, code, err
 	default:
 		return true, 1, fmt.Errorf("builtin %q not implemented", alias)
 	}

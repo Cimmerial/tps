@@ -24,6 +24,10 @@ func TestEnsureDefaultDevProjectCommands(t *testing.T) {
 	if p.FindCommand("sym") == nil {
 		t.Fatal("expected sym command")
 	}
+	pr := p.FindCommand("push-release")
+	if pr == nil || pr.Handler != "push-release" || pr.Shell != "" {
+		t.Fatalf("expected push-release builtin handler, got %+v", pr)
+	}
 	changed, err = EnsureDefaultDevProjectCommands(p)
 	if err != nil {
 		t.Fatal(err)

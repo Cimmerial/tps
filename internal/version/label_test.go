@@ -1,6 +1,9 @@
 package version
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestLabelRelease(t *testing.T) {
 	old := Version
@@ -40,7 +43,8 @@ func TestLabelIgnoresBareCommitFromGitDescribe(t *testing.T) {
 		describeGit = oldD
 		moduleVersionLabel = oldM
 	}()
-	if Label() != "v0.1.0" {
-		t.Fatalf("Label() = %q", Label())
+	want := "v" + strings.TrimPrefix(DevVersion, "v")
+	if Label() != want {
+		t.Fatalf("Label() = %q want %q", Label(), want)
 	}
 }
