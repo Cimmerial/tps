@@ -1,7 +1,9 @@
 package runner
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -24,20 +26,28 @@ func RunCommand(p *config.Project, alias string) (int, error) {
 
 // RunScript runs shell in the project directory (stdin/stdout/stderr attached).
 func RunScript(p *config.Project, script string) (int, error) {
+	code, _, err := RunScriptCaptureStderr(p, script)
+	return code, err
+}
+
+// RunScriptCaptureStderr runs shell like RunScript and returns a copy of stderr (still streamed live).
+func RunScriptCaptureStderr(p *config.Project, script string) (int, string, error) {
 	script = strings.TrimSpace(script)
 	if script == "" {
-		return 0, nil
+		return 0, "", nil
 	}
 	c := scriptCommand(script)
 	c.Dir = p.Path
+	c.Env = scriptEnviron(p)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
+	var buf bytes.Buffer
+	c.Stderr = io.MultiWriter(os.Stderr, &buf)
 	if err := c.Run(); err != nil {
 		if exit, ok := err.(*exec.ExitError); ok {
-			return exit.ExitCode(), nil
+			return exit.ExitCode(), buf.String(), nil
 		}
-		return 1, err
+		return 1, buf.String(), err
 	}
-	return 0, nil
+	return 0, buf.String(), nil
 }

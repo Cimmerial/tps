@@ -23,6 +23,15 @@ func TestResolveMenuInputClearVsTps(t *testing.T) {
 	}
 }
 
+func TestResolveMenuInputVersion(t *testing.T) {
+	for _, line := range []string{"ver", "version", "VER"} {
+		in, err := resolveMenuInput(nil, &config.Project{}, line)
+		if err != nil || in.Action != ActionVersion {
+			t.Fatalf("%q: %+v err=%v", line, in, err)
+		}
+	}
+}
+
 func TestResolveMenuInputViteBuiltin(t *testing.T) {
 	in, err := resolveMenuInput(nil, &config.Project{}, "vite")
 	if err != nil || in.Action != ActionCloseAllTerms {

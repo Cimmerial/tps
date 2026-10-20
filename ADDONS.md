@@ -47,6 +47,7 @@ Install commands (for example `install utilities` / `iu`) may be run from **any*
 ```yaml
 id: tps-utilities          # stable id (used by install and guards)
 name: tps-utilities        # default link name
+version: 0.1.0             # addon release version (bump on meaningful releases)
 clone_url: https://github.com/Cimmerial/tps-utilities.git
 contract_iteration: 1      # highest ADDONS.md iteration this repo implements
 min_tps: ""                # optional semver hint

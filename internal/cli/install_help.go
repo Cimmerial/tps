@@ -2,7 +2,9 @@ package cli
 
 import (
 	"fmt"
+	"path/filepath"
 
+	"github.com/Cimmerial/tps/internal/addon"
 	"github.com/Cimmerial/tps/internal/config"
 	"github.com/Cimmerial/tps/internal/ui"
 )
@@ -10,6 +12,12 @@ import (
 func devRepoRoot(cfg *config.Config, selected *config.Project) string {
 	if selected != nil && canSelfUpdate(selected.Path) {
 		return selected.Path
+	}
+	if selected != nil && addon.IsAddonProject(selected.Path) {
+		sibling := filepath.Join(filepath.Dir(selected.Path), "tps")
+		if canSelfUpdate(sibling) {
+			return sibling
+		}
 	}
 	if cfg != nil {
 		for _, p := range cfg.Projects {

@@ -1,17 +1,15 @@
 package cli
 
 import (
-	"fmt"
-
-	"github.com/Cimmerial/tps/internal/version"
 	"github.com/spf13/cobra"
 )
 
 var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Print the tps version",
+	Use:     "version",
+	Aliases: []string{"ver"},
+	Short:   "Print the tps version",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(version.Version)
+		printTPSVersion(nil)
 	},
 }
 

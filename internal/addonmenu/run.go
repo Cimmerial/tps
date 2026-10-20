@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/Cimmerial/tps/internal/config"
@@ -14,7 +15,7 @@ import (
 )
 
 // RunCommandMenu runs a project command's menu tree until the user backs out.
-func RunCommandMenu(p *config.Project, cmd *config.Command, readLine func() (string, error)) (int, error) {
+func RunCommandMenu(p *config.Project, cmd *config.Command) (int, error) {
 	if p == nil || cmd == nil {
 		return 1, fmt.Errorf("no command")
 	}
@@ -32,17 +33,23 @@ func RunCommandMenu(p *config.Project, cmd *config.Command, readLine func() (str
 		return 1, err
 	}
 	stack := []*MenuFile{&root}
+	menuFresh := true
 	for {
 		cur := stack[len(stack)-1]
 		title := strings.TrimSpace(cur.Title)
 		if title == "" {
 			title = cmd.Alias
 		}
-		ui.ClearScreen()
+		if menuFresh {
+			ui.ClearScreen()
+			menuFresh = false
+		} else {
+			fmt.Println()
+		}
 		fmt.Println()
 		fmt.Printf("%s\n", ui.Header(title))
 		fmt.Println()
-		fmt.Printf("    %s\n", ui.Dim("number to choose — 0 or q = back"))
+		fmt.Printf("    %s\n", ui.Dim("number to choose — Enter, 0, or q = back"))
 		fmt.Println()
 
 		choices := visibleItems(cur.Items)
@@ -60,30 +67,26 @@ func RunCommandMenu(p *config.Project, cmd *config.Command, readLine func() (str
 		fmt.Printf("    %s  %s\n", ui.Abbrev("0"), ui.Dim("back"))
 		fmt.Println()
 
-		line, err := readLine()
+		choice, back, err := readAddonMenuChoice()
 		if err != nil {
 			return 1, err
 		}
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		low := strings.ToLower(line)
-		if low == "0" || low == "q" || low == "quit" || low == "back" {
+		if back {
 			if len(stack) == 1 {
+				ui.ClearScreen()
 				return 0, nil
 			}
 			stack = stack[:len(stack)-1]
 			continue
 		}
-		n, err := parseChoice(line, len(choices))
-		if err != nil {
-			fmt.Printf("%s\n", ui.Yellow(err.Error()))
+		if choice < 1 || choice > len(choices) {
+			fmt.Printf("%s\n", ui.Yellow(fmt.Sprintf("enter a number 1–%d or 0 to go back", len(choices))))
 			continue
 		}
-		item := choices[n-1]
+		item := choices[choice-1]
 		if item.Back {
 			if len(stack) == 1 {
+				ui.ClearScreen()
 				return 0, nil
 			}
 			stack = stack[:len(stack)-1]
@@ -99,7 +102,7 @@ func RunCommandMenu(p *config.Project, cmd *config.Command, readLine func() (str
 			continue
 		}
 		if item.Action != nil {
-			code, err := runAction(p, item.Action)
+			code, _, err := runAction(p, item.Action)
 			if err != nil {
 				return code, err
 			}
@@ -110,6 +113,28 @@ func RunCommandMenu(p *config.Project, cmd *config.Command, readLine func() (str
 		}
 		fmt.Printf("%s\n", ui.Yellow("menu item has no action"))
 	}
+}
+
+// readAddonMenuChoice matches edit/options menus: Enter or 0 = back.
+func readAddonMenuChoice() (choice int, back bool, err error) {
+	line, err := ui.ReadEditedLine(ui.Prompt())
+	if err != nil {
+		return 0, false, err
+	}
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return 0, true, nil
+	}
+	low := strings.ToLower(line)
+	if low == "0" || low == "q" || low == "quit" || low == "back" {
+		return 0, true, nil
+	}
+	n, err := strconv.Atoi(line)
+	if err != nil {
+		fmt.Println(ui.Dim("enter a number"))
+		return 0, true, nil
+	}
+	return n, false, nil
 }
 
 func visibleItems(items []MenuItem) []MenuItem {
@@ -127,20 +152,36 @@ func parseChoice(line string, max int) (int, error) {
 	return choice, nil
 }
 
-func runAction(p *config.Project, action *MenuAction) (int, error) {
+func printActionSummary(lines []string) {
+	if len(lines) == 0 {
+		return
+	}
+	for _, line := range lines {
+		fmt.Println(line)
+	}
+	fmt.Println()
+}
+
+func runAction(p *config.Project, action *MenuAction) (int, []string, error) {
 	picks, err := collectPicks(action.Picks)
 	if err != nil {
 		if err == pick.ErrCancelled {
-			return 0, nil
+			fmt.Println(ui.Dim("picker cancelled"))
+			return 0, nil, nil
 		}
-		return 1, err
+		fmt.Printf("%s\n", ui.Yellow(err.Error()))
+		return 0, nil, nil
 	}
 	shell := expandShell(p.Path, action.Shell, picks)
-	var code int
-	ui.BrailleWaitStderr("running…", func() {
-		code, err = runner.RunScript(p, shell)
-	})
-	return code, err
+	if strings.Contains(action.Shell, "bin/tpsu") {
+		bin := filepath.Join(p.Path, "bin", "tpsu")
+		if _, err := os.Stat(bin); err != nil {
+			fmt.Printf("%s\n", ui.Yellow("missing bin/tpsu — in the addon repo run: go build -o bin/tpsu ./cmd/tpsu"))
+			return 1, nil, nil
+		}
+	}
+	code, err := runner.RunScript(p, shell)
+	return code, nil, err
 }
 
 func collectPicks(specs []PickSpec) ([]string, error) {

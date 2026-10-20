@@ -23,7 +23,7 @@ func executeProjectCommand(p *config.Project, alias string, inputs []string) (in
 		if len(inputs) > 0 {
 			return 1, false, fmt.Errorf("command %q uses a menu; run it without -inputs", alias)
 		}
-		code, err := addonmenu.RunCommandMenu(p, cmd, readMenuLine)
+		code, err := addonmenu.RunCommandMenu(p, cmd)
 		return code, false, err
 	}
 	chain, err := p.CommandRunChain(alias)

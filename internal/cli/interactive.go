@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Cimmerial/tps/internal/addon"
 	"github.com/Cimmerial/tps/internal/config"
 	gittool "github.com/Cimmerial/tps/internal/git"
 	"github.com/Cimmerial/tps/internal/jobs"
@@ -134,6 +135,10 @@ func runInteractive() error {
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
 			printFullHelp(selected)
+		case ActionVersion:
+			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
+			printTPSVersion(selected)
 		case ActionInstallHelp:
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
@@ -165,7 +170,19 @@ func runInteractive() error {
 		case ActionUpdate:
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
+			if selected != nil && addon.IsAddonProject(selected.Path) {
+				if err := update.PullFastForward(selected.Path); err != nil {
+					fmt.Fprintf(os.Stderr, "addon pull: %v\n", err)
+				} else if err := buildUtilitiesBinary(selected.Path); err != nil {
+					fmt.Fprintf(os.Stderr, "%s\n", ui.Yellow("addon build: "+err.Error()))
+				} else {
+					fmt.Println(ui.Green("addon updated"))
+				}
+			}
 			root := devRepoRoot(cfg, selected)
+			if root == "" && selected != nil && addon.IsAddonProject(selected.Path) {
+				fmt.Println(ui.Dim("tps CLI: updated from GitHub release (link sibling ../tps dev repo for local tps fixes)"))
+			}
 			if err := update.InstallAndRestart(root); err != nil {
 				fmt.Fprintf(os.Stderr, "update: %v\n", err)
 			}
@@ -279,6 +296,8 @@ func runInteractive() error {
 				fmt.Fprintf(os.Stderr, "install utilities: %v\n", err)
 			}
 		case ActionRun:
+			runCmd := selected.FindCommand(input.Alias)
+			hadMenu := runCmd != nil && strings.TrimSpace(runCmd.Menu) != ""
 			code, compactPrompt, err := executeProjectCommand(selected, input.Alias, input.ShellInputs)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -287,6 +306,11 @@ func runInteractive() error {
 			if code != 0 {
 				fmt.Fprintf(os.Stderr, "command exited with code %d\n", code)
 				continue
+			}
+			if hadMenu {
+				if err := refreshInteractiveSession(projectID, statusTick, "", false); err != nil {
+					return err
+				}
 			}
 			selected.RecordCommandUse(input.Alias)
 			if err := config.Save(cfg); err != nil {

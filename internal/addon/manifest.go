@@ -20,6 +20,7 @@ const (
 type Manifest struct {
 	ID                 string           `yaml:"id"`
 	Name               string           `yaml:"name"`
+	Version            string           `yaml:"version"`
 	CloneURL           string           `yaml:"clone_url"`
 	ContractIteration  int              `yaml:"contract_iteration"`
 	MinTPS             string           `yaml:"min_tps"`
@@ -75,6 +76,7 @@ func DefaultUtilitiesManifest() Manifest {
 	return Manifest{
 		ID:                UtilitiesID,
 		Name:              UtilitiesDirName,
+		Version:           "0.1.0",
 		CloneURL:          UtilitiesCloneURL,
 		ContractIteration: CurrentContractIteration,
 		Commands: []config.Command{

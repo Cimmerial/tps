@@ -38,6 +38,7 @@ const (
 	ActionCloseAllTerms
 	ActionInstallUtilities
 	ActionOpenInIDE
+	ActionVersion
 )
 
 type MenuInput struct {
@@ -163,6 +164,7 @@ func printFullHelp(p *config.Project) {
 		title: "help",
 		rows: []helpRow{
 			cmdRow("help", "h", "this list"),
+			cmdRow("version", "ver", "tps version (addon version when on an addon project)"),
 			cmdRow("install", "ih", "install & link repos on this or another machine"),
 		},
 	})
@@ -389,6 +391,8 @@ func resolveMenuInput(cfg *config.Config, p *config.Project, line string) (MenuI
 	switch low {
 	case "h", "help", "?":
 		return MenuInput{Action: ActionHelp}, nil
+	case "ver", "version":
+		return MenuInput{Action: ActionVersion}, nil
 	case "clear":
 		return MenuInput{Action: ActionClear, ClearScrollback: true}, nil
 	case "tps":
