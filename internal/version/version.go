@@ -5,4 +5,4 @@ package version
 var Version = "dev"
 
 // DevVersion is the semver shown for (devel) builds. Keep in sync with release tags.
-const DevVersion = "0.1.5"
+const DevVersion = "0.1.6"
