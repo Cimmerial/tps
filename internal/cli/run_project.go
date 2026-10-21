@@ -79,7 +79,9 @@ func executeProjectCommand(p *config.Project, alias string, inputs []string) (in
 		}
 		fg = append(fg, shells...)
 	}
-	code, err := runForegroundChain(p, fg)
+	targetCmd := p.FindCommand(target)
+	handoff := targetCmd != nil && targetCmd.Handoff
+	code, err := runForegroundChain(p, fg, handoff)
 	return code, compactNextPrompt, err
 }
 
@@ -90,11 +92,17 @@ func joinDetachedShellPrecursors(precursors []string, shell string) string {
 	return strings.Join(precursors, " && ") + " && " + shell
 }
 
-func runForegroundChain(p *config.Project, parts []string) (int, error) {
+func runForegroundChain(p *config.Project, parts []string, handoff bool) (int, error) {
 	if len(parts) == 0 {
 		return 0, nil
 	}
 	script := strings.Join(parts, " && ")
+	if handoff {
+		if err := runner.HandoffScript(p, script); err != nil {
+			return 1, err
+		}
+		return 0, nil
+	}
 	var code int
 	var err error
 	ui.BrailleWaitStderr("loading…", func() {

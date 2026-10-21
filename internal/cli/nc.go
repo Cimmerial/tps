@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/Cimmerial/tps/internal/config"
-	"github.com/Cimmerial/tps/internal/ui"
 )
 
 func isNewCommandToken(s string) bool {
@@ -18,7 +17,7 @@ func isNewCommandPhrase(a, b string) bool {
 
 func isNCFlagToken(s string) bool {
 	switch s {
-	case "-precursor", "--precursor", "-tags", "--tags", "-t", "--terminal", "-capture", "-m", "-n", "-a", "-c":
+	case "-precursor", "--precursor", "-tags", "--tags", "-t", "--terminal", "-H", "--handoff", "-capture", "-m", "-n", "-a", "-c":
 		return true
 	default:
 		return false
@@ -28,6 +27,7 @@ func isNCFlagToken(s string) bool {
 func parseNewCommandFlags(fields []string) (config.Command, error) {
 	var name, abbrev, shell, capture, tagsRaw, precursor string
 	detach := false
+	handoff := false
 	for i := 0; i < len(fields); i++ {
 		switch fields[i] {
 		case "-precursor", "--precursor":
@@ -44,6 +44,8 @@ func parseNewCommandFlags(fields []string) (config.Command, error) {
 			tagsRaw = fields[i]
 		case "-t", "--terminal":
 			detach = true
+		case "-H", "--handoff":
+			handoff = true
 		case "-capture", "-m":
 			i++
 			if i >= len(fields) {
@@ -92,7 +94,11 @@ func parseNewCommandFlags(fields []string) (config.Command, error) {
 		Shell:       shell,
 		Description: name,
 		Detach:      detach,
+		Handoff:     handoff,
 		Capture:     capture,
+	}
+	if handoff {
+		cmd.Detach = false
 	}
 	if tagsRaw != "" {
 		cmd.Tags = config.ParseTagList(tagsRaw)
@@ -112,6 +118,5 @@ func addProjectCommand(cfg *config.Config, projectID string, cmd config.Command)
 	if err := config.Save(cfg); err != nil {
 		return err
 	}
-	fmt.Println(ui.Green(fmt.Sprintf("added command %q", cmd.Alias)))
 	return nil
 }

@@ -15,9 +15,15 @@ type interactiveProjectChoice struct {
 }
 
 // resolveInteractiveProject picks the session project without auto-linking new repos.
-// Restart flag and saved session_project_id override cwd when still valid.
-func resolveInteractiveProject(cfg *config.Config, cwd string, restartProjectID string) (interactiveProjectChoice, error) {
+// Restart flag, an explicit prefer ID (e.g. after setup), and saved session_project_id
+// override cwd when still valid.
+func resolveInteractiveProject(cfg *config.Config, cwd string, restartProjectID, preferProjectID string) (interactiveProjectChoice, error) {
 	if id := strings.TrimSpace(restartProjectID); id != "" {
+		if cfg.FindByID(id) != nil {
+			return interactiveProjectChoice{ProjectID: id}, nil
+		}
+	}
+	if id := strings.TrimSpace(preferProjectID); id != "" {
 		if cfg.FindByID(id) != nil {
 			return interactiveProjectChoice{ProjectID: id}, nil
 		}

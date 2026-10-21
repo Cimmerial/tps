@@ -63,7 +63,7 @@ func TestResolveInteractiveProjectNoAutoLink(t *testing.T) {
 		},
 	}
 
-	choice, err := resolveInteractiveProject(cfg, unlinked, "")
+	choice, err := resolveInteractiveProject(cfg, unlinked, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestResolveInteractiveProjectFromCwd(t *testing.T) {
 		},
 	}
 
-	choice, err := resolveInteractiveProject(cfg, root, "")
+	choice, err := resolveInteractiveProject(cfg, root, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestResolveInteractiveProjectFromCwd(t *testing.T) {
 func TestResolveInteractiveProjectNoProjects(t *testing.T) {
 	dir := t.TempDir()
 	cfg := &config.Config{}
-	choice, err := resolveInteractiveProject(cfg, dir, "")
+	choice, err := resolveInteractiveProject(cfg, dir, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ func TestResolveInteractiveProjectHealByRemote(t *testing.T) {
 		},
 	}
 
-	choice, err := resolveInteractiveProject(cfg, newRoot, "")
+	choice, err := resolveInteractiveProject(cfg, newRoot, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,11 +181,47 @@ func TestResolveInteractiveProjectSessionOverridesCwd(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	choice, err := resolveInteractiveProject(cfg, rootA, "")
+	choice, err := resolveInteractiveProject(cfg, rootA, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if choice.ProjectID != "b" || choice.Pick {
 		t.Fatalf("want session project beta from cwd alpha: %+v", choice)
+	}
+}
+
+func TestResolveInteractiveProjectPreferOverridesSession(t *testing.T) {
+	setTestPreferencesHome(t)
+
+	rootA := t.TempDir()
+	initGitRepo(t, rootA)
+	rootAClean, err := project.ProjectRootFromCwd(rootA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootB := t.TempDir()
+	initGitRepo(t, rootB)
+	rootBClean, err := project.ProjectRootFromCwd(rootB)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.Config{
+		Projects: []config.Project{
+			{ID: "a", Name: "alpha", Path: rootAClean},
+			{ID: "b", Name: "beta", Path: rootBClean},
+		},
+	}
+
+	if err := config.SaveSessionProjectID("b"); err != nil {
+		t.Fatal(err)
+	}
+
+	choice, err := resolveInteractiveProject(cfg, rootA, "", "a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if choice.ProjectID != "a" || choice.Pick {
+		t.Fatalf("want prefer project alpha over session beta: %+v", choice)
 	}
 }

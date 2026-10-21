@@ -24,10 +24,11 @@ var setupCmd = &cobra.Command{
 	Short: "Install/update tps and link a project (run from the app repo)",
 	Long:  "Install or update tps from your linked dev repo when present, ensure Go bin is on PATH in ~/.zshrc, link the project, refresh TPS.md, and add TPS.md to .gitignore.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := runSetup(setupName, setupPath); err != nil {
+		preferID, err := runSetup(setupName, setupPath)
+		if err != nil {
 			return err
 		}
-		return runInteractive()
+		return runInteractive(preferID)
 	},
 }
 
@@ -37,14 +38,14 @@ func init() {
 	rootCmd.AddCommand(setupCmd)
 }
 
-func runSetup(nameOverride, pathOverride string) error {
+func runSetup(nameOverride, pathOverride string) (string, error) {
 	cfg, err := config.Load()
 	if err != nil {
-		return err
+		return "", err
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
-		return err
+		return "", err
 	}
 	linkDir := cwd
 	if pathOverride != "" {
@@ -53,17 +54,17 @@ func runSetup(nameOverride, pathOverride string) error {
 
 	root, err := project.ProjectRootFromCwd(linkDir)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if existing := cfg.FindByPath(root); existing != nil && nameOverride == "" && pathOverride == "" {
 		fmt.Println(ui.Yellow(fmt.Sprintf("%q is already set up at %s", existing.Name, existing.Path)))
 		fmt.Println(ui.Dim("add commands in config.yaml, nc, or export/import · run ih for install help"))
 		if tpsRepo := instance.DevRepoRoot(cfg); tpsRepo != "" {
 			if _, err := instance.SyncProject(tpsRepo, existing.Path); err != nil {
-				return err
+				return "", err
 			}
 		}
-		return nil
+		return existing.ID, nil
 	}
 
 	tpsRepo := devRepoRoot(cfg, nil)
@@ -72,7 +73,7 @@ func runSetup(nameOverride, pathOverride string) error {
 		result, err := update.InstallFromProjectRoot(tpsRepo)
 		spin.Stop()
 		if err != nil {
-			return err
+			return "", err
 		}
 		if result.Updated {
 			fmt.Println(ui.Green("tps updated"))
@@ -95,13 +96,13 @@ func runSetup(nameOverride, pathOverride string) error {
 
 	linked, err := linkProjectAt(cfg, linkDir, nameOverride)
 	if err != nil {
-		return err
+		return "", err
 	}
 	fmt.Printf("%s %q at %s\n", ui.Green("linked"), linked.Name, linked.Path)
 	if linked.GitRemote != "" {
 		fmt.Printf("%s %s\n", ui.Dim("remote:"), linked.GitRemote)
 	}
-	return nil
+	return linked.ID, nil
 }
 
 func linkProjectAt(cfg *config.Config, linkDir, name string) (*config.Project, error) {

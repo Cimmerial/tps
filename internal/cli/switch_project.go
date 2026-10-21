@@ -22,6 +22,7 @@ func switchProject(reader *bufio.Reader, cfg *config.Config, currentID string, n
 	}
 
 	fmt.Println(ui.Dim("switch project:"))
+	fmt.Printf("    %s\n", ui.Dim("number or name — Enter or q = back"))
 	for i, p := range cfg.Projects {
 		marker := " "
 		if p.ID == currentID {
@@ -34,7 +35,7 @@ func switchProject(reader *bufio.Reader, cfg *config.Config, currentID string, n
 		return "", err
 	}
 	line = strings.TrimSpace(line)
-	if line == "" || strings.EqualFold(line, "q") {
+	if isProjectPickBack(line) {
 		return "", nil
 	}
 	if id := findProjectID(cfg, line); id != "" {
@@ -45,6 +46,13 @@ func switchProject(reader *bufio.Reader, cfg *config.Config, currentID string, n
 		return "", err
 	}
 	return cfg.Projects[n-1].ID, nil
+}
+
+// isProjectPickBack reports whether a picker line backs out of the switch-project
+// menu instead of switching: Enter on its own (or q), like the other tps submenus.
+func isProjectPickBack(line string) bool {
+	line = strings.TrimSpace(line)
+	return line == "" || strings.EqualFold(line, "q")
 }
 
 func findProjectID(cfg *config.Config, query string) string {

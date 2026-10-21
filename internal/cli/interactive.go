@@ -15,7 +15,7 @@ import (
 	"github.com/Cimmerial/tps/internal/update"
 )
 
-func runInteractive() error {
+func runInteractive(preferProjectID string) error {
 	restartBanner := takeSessionRestartBanner()
 	restartProjectID := takeSessionRestartProjectID()
 
@@ -36,7 +36,7 @@ func runInteractive() error {
 	}
 
 	var projectID string
-	choice, err := resolveInteractiveProject(cfg, cwd, restartProjectID)
+	choice, err := resolveInteractiveProject(cfg, cwd, restartProjectID, preferProjectID)
 	spin.Stop()
 	if err != nil {
 		return err
@@ -168,14 +168,15 @@ func runInteractive() error {
 			}
 		case ActionNewCommand:
 			recordMetaUse(cfg, selected, input.Action)
+			newAlias := input.NewCmd.Alias
 			if err := addProjectCommand(cfg, projectID, input.NewCmd); err != nil {
 				fmt.Fprintf(os.Stderr, "nc: %v\n", err)
 				continue
 			}
-			cfg, selected, err = loadProject(projectID)
-			if err != nil {
+			if err := refreshInteractiveSession(projectID, statusTick, "", false); err != nil {
 				return err
 			}
+			fmt.Println(ui.Green(fmt.Sprintf("added command %q", newAlias)))
 		case ActionUpdate:
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
@@ -212,6 +213,14 @@ func runInteractive() error {
 			newID, err := switchProject(reader, cfg, projectID, input.Text)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "project: %v\n", err)
+				continue
+			}
+			if newID == "" {
+				// Enter (or q) at the picker backs out: close the switch-project
+				// list and put the main menu back on top of the screen.
+				if err := refreshInteractiveSession(projectID, statusTick, "", false); err != nil {
+					return err
+				}
 				continue
 			}
 			projectID, prevProjectID, err = applyInteractiveProjectSwitch(selected, projectID, prevProjectID, newID, statusTick)
@@ -284,8 +293,14 @@ func runInteractive() error {
 		case ActionSetup:
 			recordMetaUse(cfg, selected, input.Action)
 			config.Save(cfg)
-			if err := runSetup(input.SetupName, input.SetupPath); err != nil {
+			preferID, err := runSetup(input.SetupName, input.SetupPath)
+			if err != nil {
 				fmt.Fprintf(os.Stderr, "setup: %v\n", err)
+			} else if preferID != "" && preferID != projectID {
+				projectID, prevProjectID, err = applyInteractiveProjectSwitch(selected, projectID, prevProjectID, preferID, statusTick)
+				if err != nil {
+					return err
+				}
 			}
 		case ActionConfigExamples:
 			recordMetaUse(cfg, selected, input.Action)

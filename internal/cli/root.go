@@ -17,7 +17,7 @@ var rootCmd = &cobra.Command{
 	Long:  "Link projects and run short command aliases.",
 	// No args → interactive mode (add this in session 4)
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return runInteractive() // stub: return fmt.Errorf("not implemented")
+		return runInteractive("") // stub: return fmt.Errorf("not implemented")
 	},
 }
 

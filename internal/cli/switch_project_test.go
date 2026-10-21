@@ -37,6 +37,19 @@ func TestSwitchProjectByNameArgSameCurrent(t *testing.T) {
 	}
 }
 
+func TestIsProjectPickBack(t *testing.T) {
+	for _, line := range []string{"", "   ", "q", "Q"} {
+		if !isProjectPickBack(line) {
+			t.Fatalf("line=%q want back", line)
+		}
+	}
+	for _, line := range []string{"1", "beta", "quit"} {
+		if isProjectPickBack(line) {
+			t.Fatalf("line=%q want pick, not back", line)
+		}
+	}
+}
+
 func TestParsePickIndex(t *testing.T) {
 	n, err := parsePickIndex("2", 3)
 	if err != nil || n != 2 {

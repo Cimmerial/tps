@@ -27,7 +27,7 @@ func readLine(_ *bufio.Reader, projectID string, tick int, padBefore bool) (stri
 
 func needsGapBeforeNextPrompt(action InputAction) bool {
 	switch action {
-	case ActionNoop, ActionQuit, ActionClear, ActionSwitchProject, ActionSwitchProjectBack, ActionOptions, ActionVersion:
+	case ActionNoop, ActionQuit, ActionClear, ActionNewCommand, ActionSwitchProject, ActionSwitchProjectBack, ActionOptions, ActionVersion:
 		return false
 	default:
 		return true

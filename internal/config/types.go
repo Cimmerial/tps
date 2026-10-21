@@ -21,6 +21,7 @@ type Command struct {
 	Description string `yaml:"description,omitempty"`
 	Detach          bool `yaml:"detach,omitempty"`
 	ForceForeground bool `yaml:"foreground,omitempty"` // skip auto-detach heuristics
+	Handoff         bool `yaml:"handoff,omitempty"`    // replace tps with this command in the same terminal
 	CloseOnComplete bool `yaml:"close_on_complete,omitempty"` // close detached terminal tab when the shell command exits
 	Capture        string   `yaml:"capture,omitempty"`         // regex or preset (url, trycloudflare, …)
 	CaptureActions []string `yaml:"capture_actions,omitempty"` // print, clipboard, sms
