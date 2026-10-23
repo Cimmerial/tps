@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"os/exec"
 	"sort"
 	"strings"
@@ -108,21 +107,21 @@ func printMenuHints(p *config.Project) {
 		pinnedParts = append(pinnedParts, hintPart(h.abbr, h.label))
 	}
 
-	header := ui.Header("TPS CMDS:")
 	mainLine := strings.Join(mainParts, dot)
 	pinnedLine := strings.Join(pinnedParts, dot)
-
-	if pinnedLine == "" {
-		fmt.Printf("%s %s\n", header, mainLine)
-		return
+	line := mainLine
+	if pinnedLine != "" {
+		bar := ui.Dim(" | ")
+		if line == "" {
+			line = pinnedLine
+		} else {
+			line = line + bar + pinnedLine
+		}
 	}
-	bar := ui.Dim(" | ")
-	if mainLine == "" {
-		fmt.Printf("%s%s%s\n", header, bar, pinnedLine)
-		return
-	}
-
-	fmt.Printf("%s %s%s%s\n", header, mainLine, bar, pinnedLine)
+	box := ui.NewMenuBox(ui.ChromeSession)
+	box.Title(ui.HeaderInfo("TPS CMDS:"))
+	box.Plain(ui.SectionTrail{LastSection: true, LastRow: true}, line)
+	box.Flush()
 }
 
 func metaKeyForAction(action InputAction) string {

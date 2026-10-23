@@ -168,6 +168,13 @@ func runInteractive(preferProjectID string) error {
 			}
 		case ActionNewCommand:
 			recordMetaUse(cfg, selected, input.Action)
+			config.Save(cfg)
+			if input.NewCmdEditor {
+				if err := editAddCommand(reader, cfg, projectID); err != nil {
+					fmt.Fprintf(os.Stderr, "nc: %v\n", err)
+				}
+				continue
+			}
 			newAlias := input.NewCmd.Alias
 			if err := addProjectCommand(cfg, projectID, input.NewCmd); err != nil {
 				fmt.Fprintf(os.Stderr, "nc: %v\n", err)

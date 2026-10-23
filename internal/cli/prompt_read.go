@@ -13,16 +13,21 @@ var promptLineHistory []string
 func readLine(_ *bufio.Reader, projectID string, tick int, padBefore bool) (string, error) {
 	drainDetachedCompleteNotices()
 	if padBefore {
-		fmt.Print("\r\033[K\n")
+		fmt.Println()
 	}
-	line, err := ui.ReadEditedLineFuncHistory(func() string {
+	ui.SetPromptChrome(ui.ChromeInfo)
+	line, err := ui.ReadEditedLineFuncHistoryWithOpts(func() string {
 		active, _ := jobs.Reap(projectID)
 		return ui.PromptBusy(len(active), tick)
-	}, &promptLineHistory)
+	}, &promptLineHistory, ui.ReadLineOptions{})
 	if err != nil {
 		return "", err
 	}
 	return line, nil
+}
+
+func readMenuLine() (string, error) {
+	return ui.ReadMenuLine()
 }
 
 func needsGapBeforeNextPrompt(action InputAction) bool {

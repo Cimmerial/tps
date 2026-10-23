@@ -33,20 +33,23 @@ func editShellSubmenu(reader *bufio.Reader, projectID, alias string) error {
 		}
 
 		fmt.Println()
-		fmt.Printf("%s\n", ui.Header("edit"))
-		fmt.Println()
-		fmt.Printf("%s\n", ui.SubHeader(alias+" — shell"))
-		fmt.Println()
-		fmt.Printf("    %s\n", ui.Dim("numbered choices — 0 or q = back"))
+		fmt.Printf("%s\n", ui.HeaderChoice("edit"))
+		fmt.Printf("%s\n", ui.SubHeaderChoice(alias+" — shell"))
 		fmt.Println()
 
 		rows, picks, groups := editShellMenuBuild(*cmd)
-		for _, g := range groups {
-			fmt.Printf("%s\n", ui.SubHeader(g.title))
-			printNumberedMenuRows(rows[g.start:g.end])
+		for i, g := range groups {
+			if g.end <= g.start {
+				continue
+			}
+			fmt.Printf("%s\n", ui.SubHeaderChoice(g.title))
+			printChoiceEditMenuPanel("", []menuPanelSection{{Rows: rows[g.start:g.end]}}, nil)
+			if i < len(groups)-1 {
+				fmt.Println()
+			}
 		}
 		fmt.Println()
-		printNumberedMenuRows([]numberedMenuRow{
+		printChoiceEditMenuPanel("", nil, []numberedMenuRow{
 			{Num: "0", Desc: ui.Dim("back (q)")},
 		})
 		fmt.Println()
@@ -100,8 +103,8 @@ func editShellMenuBuild(cmd config.Command) ([]numberedMenuRow, []shellMenuPick,
 			rows = append(rows, numberedMenuRow{
 				Num:      fmt.Sprintf("%d", n),
 				Status:   f.Key,
-				Desc:     ui.Dim("edit"),
-				HelpLine: editTruncateDisplay(f.Value, 72),
+				Desc:     "edit",
+				HelpLine: editMenuHelpLine(editTruncateDisplay(f.Value, 72)),
 			})
 			picks = append(picks, shellMenuPick{editKey: f.Key})
 		}
@@ -109,7 +112,7 @@ func editShellMenuBuild(cmd config.Command) ([]numberedMenuRow, []shellMenuPick,
 		rows = append(rows, numberedMenuRow{
 			Num:    fmt.Sprintf("%d", n),
 			Status: "add",
-			Desc:   ui.Dim("new " + editShellPlatformLabel(g.platform) + " line"),
+			Desc:   "new " + editShellPlatformLabel(g.platform) + " line",
 		})
 		picks = append(picks, shellMenuPick{addPlatform: g.platform})
 		groups = append(groups, shellMenuGroup{title: g.title, start: start, end: len(rows)})
@@ -146,10 +149,9 @@ func editPromptShellKey(reader *bufio.Reader, projectID, alias, key string) erro
 			break
 		}
 	}
+	printEditFieldPromptPanel(key, "click Enter to keep current option, input \"-\" to remove this shell line", cur)
 	fmt.Println()
-	fmt.Printf("current %s: %s\n", key, ui.Faint(cur))
-	fmt.Println(ui.Dim("Enter to keep · - to remove this shell line"))
-	line, err := ui.ReadEditedLine(fmt.Sprintf("new %s: ", key))
+	line, err := readEditNewLine()
 	if err != nil {
 		return editPromptErr(err)
 	}
@@ -186,10 +188,14 @@ func editPromptAddShell(reader *bufio.Reader, projectID, alias string, platform 
 		return fmt.Errorf("no command %q", alias)
 	}
 	key := cmd.NextShellKey(platform)
+	printEditFieldPromptPanel(
+		"new "+editShellPlatformLabel(platform)+" shell line",
+		"click Enter to cancel",
+		"",
+	)
+	fmt.Println(ui.Dim("key: "+key))
 	fmt.Println()
-	fmt.Printf("new key: %s\n", ui.Faint(key))
-	fmt.Println(ui.Dim("Enter to cancel"))
-	line, err := ui.ReadEditedLine("new command: ")
+	line, err := readEditNewLine()
 	if err != nil {
 		return editPromptErr(err)
 	}

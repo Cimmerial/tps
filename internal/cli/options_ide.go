@@ -18,7 +18,7 @@ func optionsPreferredIDERowDesc(prefs *config.Preferences) string {
 			label = string(current)
 		}
 	}
-	return ui.Dim("default IDE") + " — " + optionsRowDescCurrent(label)
+	return optionsTopMenuItemDesc("default IDE", label)
 }
 
 func optionsPreferredIDEMenu(prefs *config.Preferences, projectID string, statusTick int) (bool, error) {
@@ -38,7 +38,7 @@ func optionsPreferredIDEMenu(prefs *config.Preferences, projectID string, status
 	}
 
 	fmt.Println()
-	fmt.Printf("%s\n", ui.Header("options"))
+	fmt.Printf("%s\n", ui.HeaderChoice("options"))
 	fmt.Println()
 	fmt.Printf("%s\n", ui.SubHeader("default IDE"))
 	fmt.Printf("    %s %s\n", ui.Dim("current:"), ui.Bold(optionsPreferredIDELabel(current)))

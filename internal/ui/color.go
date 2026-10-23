@@ -14,7 +14,10 @@ const (
 	yellow       = "\033[33m"
 	magenta      = "\033[35m"
 	blue         = "\033[34m"
-	red = "\033[31m"
+	red          = "\033[31m"
+	brightWhite  = "\033[97m"
+	brightBlue   = "\033[94m"
+	gray         = "\033[90m"
 )
 
 func ColorEnabled() bool {
@@ -44,12 +47,27 @@ func Yellow(s string) string  { return paint(yellow, s) }
 func Magenta(s string) string { return paint(magenta, s) }
 func Blue(s string) string    { return paint(blue, s) }
 func Red(s string) string { return paint(red, s) }
+func BrightWhite(s string) string { return paint(brightWhite, s) }
+func BrightBlue(s string) string { return paint(brightBlue, s) }
+func Gray(s string) string { return paint(gray, s) }
 
-// Abbrev highlights shortcut keys in menus and hints (bright accent).
-func Abbrev(s string) string { return paint(abbrevCode(), s) }
+// Abbrev highlights shortcut keys in menus and hints (bright blue).
+func Abbrev(s string) string { return BrightBlue(s) }
 
 func Prompt() string {
 	return PromptBusy(0, 0)
+}
+
+// NewValuePrompt is the prefix when entering a new value in edit field prompts.
+func NewValuePrompt() string {
+	return Green("new ") + paint(red, ">: ")
+}
+
+func promptPrefix(mode ChromeMode) string {
+	if mode == ChromeChoice {
+		return paint(red, ">: ")
+	}
+	return paint(magenta, ">: ")
 }
 
 func BrailleFrame(tick int) string {
@@ -60,7 +78,12 @@ func BrailleFrame(tick int) string {
 }
 
 func PromptBusy(running int, tick int) string {
-	prompt := paint(accentCode(), "> ")
+	return PromptBusyChrome(promptChrome, running, tick)
+}
+
+// PromptBusyChrome builds the prompt prefix for a chrome mode.
+func PromptBusyChrome(mode ChromeMode, running int, tick int) string {
+	prompt := promptPrefix(mode)
 	if running <= 0 {
 		return prompt
 	}

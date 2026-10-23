@@ -120,6 +120,19 @@ func TestEditCommandSubmenuRowsNoCloseWhenForeground(t *testing.T) {
 	}
 }
 
+func TestEditCommandIsUntouchedDraft(t *testing.T) {
+	draft := config.Command{Alias: "new"}
+	if !editCommandIsUntouchedDraft(draft, "new") {
+		t.Fatal("expected untouched")
+	}
+	if editCommandIsUntouchedDraft(config.Command{Alias: "new", Shell: "x"}, "new") {
+		t.Fatal("shell set")
+	}
+	if editCommandIsUntouchedDraft(config.Command{Alias: "renamed"}, "new") {
+		t.Fatal("renamed")
+	}
+}
+
 func TestEditNextDraftAlias(t *testing.T) {
 	p := &config.Project{}
 	if editNextDraftAlias(p) != "new" {

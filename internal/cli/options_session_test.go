@@ -17,7 +17,7 @@ func TestOptionsSessionChanges(t *testing.T) {
 		SMSTo:          "+15551234567",
 	})
 	changes := optionsSessionChanges(start, after)
-	if len(changes) != 5 {
+	if len(changes) != 4 {
 		t.Fatalf("changes = %v", changes)
 	}
 	same := optionsSessionChanges(start, start)

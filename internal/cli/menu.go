@@ -10,7 +10,6 @@ import (
 	"github.com/Cimmerial/tps/internal/config"
 	"github.com/Cimmerial/tps/internal/instance"
 	"github.com/Cimmerial/tps/internal/platform"
-	"github.com/Cimmerial/tps/internal/jobs"
 	"github.com/Cimmerial/tps/internal/ui"
 )
 
@@ -52,7 +51,8 @@ type MenuInput struct {
 	ExportAll   bool
 	SetupName   string
 	SetupPath   string
-	NewCmd      config.Command
+	NewCmd            config.Command
+	NewCmdEditor      bool // nc / new command with no flags — open edit UI
 	TcKillAll         bool
 	TcKillAllProjects bool
 	TcKillID          int
@@ -93,18 +93,8 @@ func printSessionHeader(p *config.Project, projectID string, restartBanner strin
 	printCompactMenu(p)
 	fmt.Println()
 	printMenuHints(p)
-	printTerminalStatusLine(projectID, statusTick)
-}
-
-func printTerminalStatusLine(projectID string, tick int) {
-	active, err := jobs.Reap(projectID)
-	if err != nil || len(active) == 0 {
-		return
-	}
-	line := ui.TerminalsRunningLine(len(active), tick)
-	if line != "" {
-		fmt.Println(line)
-	}
+	fmt.Println()
+	printRunningTerminalsSection(projectID)
 }
 
 func printCompactMenu(p *config.Project) {
@@ -213,55 +203,31 @@ func helpSectionHasAbbrev(rows []helpRow) bool {
 }
 
 func printTPSCommandHelp(sections []helpSection) {
-	fmt.Println()
-	fmt.Printf("%s\n", ui.Header("TPS commands"))
-	for i, sec := range sections {
-		if i > 0 {
-			fmt.Println()
-		}
-		fmt.Printf("%s\n", ui.SubHeader(sec.title))
-		maxCmd, maxAbbrev := 0, 0
-		hasAbbrev := helpSectionHasAbbrev(sec.rows)
+	var panelSections []menuPanelSection
+	for _, sec := range sections {
+		var rows []numberedMenuRow
+		var tips []numberedMenuRow
 		for _, r := range sec.rows {
 			if r.tip {
+				tips = append(tips, numberedMenuRow{
+					Desc:     r.command,
+					HelpLine: r.description,
+				})
 				continue
 			}
-			if len(r.command) > maxCmd {
-				maxCmd = len(r.command)
-			}
-			if hasAbbrev && len(r.abbrev) > maxAbbrev {
-				maxAbbrev = len(r.abbrev)
-			}
+			rows = append(rows, numberedMenuRow{
+				Desc:     r.command,
+				Abbrev:   r.abbrev,
+				HelpLine: r.description,
+			})
 		}
-		var printedTips bool
-		var hadCommands bool
-		for _, r := range sec.rows {
-			if r.tip {
-				if !printedTips {
-					if hadCommands {
-						fmt.Println()
-					}
-					fmt.Printf("    %s\n", ui.Dim("tips (config.yaml — not tps commands)"))
-					printedTips = true
-				}
-				fmt.Printf("    %s %s: %s\n", ui.Dim("·"), ui.Dim(r.command), ui.Dim(r.description))
-				continue
-			}
-			cmdCol := ui.Bold(padPlain(r.command, maxCmd))
-			descCol := ui.Dim(r.description)
-			if hasAbbrev {
-				abbrPlain := padPlain(r.abbrev, maxAbbrev)
-				abbrCol := abbrPlain
-				if strings.TrimSpace(r.abbrev) != "" {
-					abbrCol = ui.Abbrev(padPlain(r.abbrev, maxAbbrev))
-				}
-				fmt.Printf("    %s | %s | %s\n", cmdCol, abbrCol, descCol)
-			} else {
-				fmt.Printf("    %s | %s\n", cmdCol, descCol)
-			}
-			hadCommands = true
-		}
+		rows = append(rows, tips...)
+		panelSections = append(panelSections, menuPanelSection{
+			Label: sec.title,
+			Rows:  rows,
+		})
 	}
+	printInfoMenuPanel("TPS commands", panelSections)
 }
 
 func isInstallHelpToken(tok string) bool {
@@ -309,51 +275,7 @@ func numberedMenuRowsHaveStatus(rows []numberedMenuRow) bool {
 }
 
 func printNumberedMenuRows(rows []numberedMenuRow) {
-	hasStatus := numberedMenuRowsHaveStatus(rows)
-	hasAbbrev := !hasStatus && numberedMenuRowsHaveAbbrev(rows)
-	maxMid := 0
-	if hasStatus {
-		for _, r := range rows {
-			if w := ui.VisibleWidth(r.Status); w > maxMid {
-				maxMid = w
-			}
-		}
-	} else if hasAbbrev {
-		for _, r := range rows {
-			if w := ui.VisibleWidth(r.Abbrev); w > maxMid {
-				maxMid = w
-			}
-		}
-	}
-	maxNum := 0
-	for _, r := range rows {
-		if len(r.Num) > maxNum {
-			maxNum = len(r.Num)
-		}
-	}
-	helpIndent := 4 + maxNum + 3 + maxMid + 3
-	for _, r := range rows {
-		numCol := ui.Bold(padPlain(r.Num, maxNum))
-		if hasStatus {
-			midPlain := padVisible(r.Status, maxMid)
-			mid := midPlain
-			if strings.TrimSpace(r.Status) != "" && !strings.Contains(r.Status, "\033") {
-				mid = ui.Dim(midPlain)
-			}
-			fmt.Printf("    %s | %s | %s\n", numCol, mid, r.Desc)
-		} else if hasAbbrev {
-			abbrCol := padVisible(r.Abbrev, maxMid)
-			if strings.TrimSpace(r.Abbrev) != "" {
-				abbrCol = ui.Abbrev(abbrCol)
-			}
-			fmt.Printf("    %s | %s | %s\n", numCol, abbrCol, r.Desc)
-		} else {
-			fmt.Printf("    %s | %s\n", numCol, r.Desc)
-		}
-		if r.HelpLine != "" {
-			fmt.Printf("%s%s\n", strings.Repeat(" ", helpIndent), ui.Faint(r.HelpLine))
-		}
-	}
+	printChoiceMenuPanel("", nil, []menuPanelSection{{Rows: rows}}, nil)
 }
 
 func padPlain(s string, width int) string {
@@ -379,7 +301,7 @@ func canSelfUpdate(projectRoot string) bool {
 func resolveMenuInput(cfg *config.Config, p *config.Project, line string) (MenuInput, error) {
 	line = strings.TrimSpace(line)
 	if line == "" {
-		return MenuInput{Action: ActionNoop}, nil
+		return MenuInput{Action: ActionClear}, nil
 	}
 	low := strings.ToLower(line)
 	switch low {
@@ -496,6 +418,9 @@ func resolveMenuInput(cfg *config.Config, p *config.Project, line string) (MenuI
 			flagFields := ncFields[1:]
 			if len(ncFields) >= 2 && isNewCommandPhrase(ncFields[0], ncFields[1]) {
 				flagFields = ncFields[2:]
+			}
+			if len(flagFields) == 0 {
+				return MenuInput{Action: ActionNewCommand, NewCmdEditor: true}, nil
 			}
 			cmd, err := parseNewCommandFlags(flagFields)
 			if err != nil {

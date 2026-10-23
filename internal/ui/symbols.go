@@ -38,7 +38,7 @@ func SymbolCatalog() []SymbolEntry {
 		{ID: "ellipsis", Glyph: SymbolEllipsis, Usage: "loading / waiting / truncated text"},
 		{ID: "middledot", Glyph: SymbolMiddleDot, Usage: "hint separator (h · e · q); menu joins; capture msgs"},
 		{ID: "command", Glyph: SymbolCommandKey, Usage: "install help (⌘V paste)"},
-		{ID: "prompt", Glyph: SymbolPrompt, Usage: "interactive input prompt (accent-colored)"},
+		{ID: "prompt", Glyph: ">:", Usage: "interactive input prompt (magenta info / red choice menus)"},
 		{ID: "braille", Glyph: frames, Usage: "all spinner frames — see braille spinner section for each"},
 		{ID: "block_light", Glyph: "░", Usage: "logo shading (blurry, clean presets)"},
 		{ID: "block_medium", Glyph: "▒", Usage: "logo shading"},

@@ -47,24 +47,8 @@ func RunCommandMenu(p *config.Project, cmd *config.Command) (int, error) {
 			fmt.Println()
 		}
 		fmt.Println()
-		fmt.Printf("%s\n", ui.Header(title))
-		fmt.Println()
-		fmt.Printf("    %s\n", ui.Dim("number to choose — Enter, 0, or q = back"))
-		fmt.Println()
-
 		choices := visibleItems(cur.Items)
-		for i, item := range choices {
-			num := fmt.Sprintf("%d", i+1)
-			label := item.Label
-			if IsDimmed(item) {
-				label = ui.Dim(label)
-			} else {
-				label = ui.Bold(label)
-			}
-			fmt.Printf("    %s  %s\n", ui.Abbrev(num), label)
-		}
-		fmt.Println()
-		fmt.Printf("    %s  %s\n", ui.Abbrev("0"), ui.Dim("back"))
+		printAddonMenuPanel(title, choices)
 		fmt.Println()
 
 		choice, back, err := readAddonMenuChoice()
@@ -120,7 +104,7 @@ func RunCommandMenu(p *config.Project, cmd *config.Command) (int, error) {
 
 // readAddonMenuChoice matches edit/options menus: Enter or 0 = back.
 func readAddonMenuChoice() (choice int, back bool, err error) {
-	line, err := ui.ReadEditedLine(ui.Prompt())
+	line, err := ui.ReadMenuLine()
 	if err != nil {
 		return 0, false, err
 	}

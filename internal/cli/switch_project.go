@@ -21,16 +21,29 @@ func switchProject(reader *bufio.Reader, cfg *config.Config, currentID string, n
 		return id, nil
 	}
 
-	fmt.Println(ui.Dim("switch project:"))
-	fmt.Printf("    %s\n", ui.Dim("number or name — Enter or q = back"))
+	ui.ClearScreen()
+	fmt.Println()
+	fmt.Printf("%s\n", ui.HeaderInfo("switch project"))
+	fmt.Println()
+
+	rows := make([]numberedMenuRow, len(cfg.Projects))
 	for i, p := range cfg.Projects {
-		marker := " "
-		if p.ID == currentID {
-			marker = "*"
+		row := numberedMenuRow{
+			Num:      fmt.Sprintf("%d", i+1),
+			Desc:     p.Name,
+			HelpLine: p.Path,
 		}
-		fmt.Printf("  %s%d) %s  %s\n", marker, i+1, p.Name, p.Path)
+		if p.ID == currentID {
+			row.Status = ui.Green("current")
+		}
+		rows[i] = row
 	}
-	line, err := ui.ReadEditedLine(ui.Prompt())
+	printChoiceEditMenuPanel("", []menuPanelSection{{Rows: rows}}, nil)
+	fmt.Println()
+	fmt.Println(ui.Dim("number or name — Enter or q = back"))
+	fmt.Println()
+
+	line, err := ui.ReadMenuLine()
 	if err != nil {
 		return "", err
 	}

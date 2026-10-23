@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -24,6 +26,11 @@ func ReadEditedLineFunc(promptFn func() string) (string, error) {
 
 // ReadEditedLineFuncHistory is like ReadEditedLineFunc but supports up/down command history when history is non-nil.
 func ReadEditedLineFuncHistory(promptFn func() string, history *[]string) (string, error) {
+	return ReadEditedLineFuncHistoryWithOpts(promptFn, history, DefaultReadLineOptions())
+}
+
+// ReadEditedLineFuncHistoryWithOpts is ReadEditedLineFuncHistory with box chrome and menu cancel behavior.
+func ReadEditedLineFuncHistoryWithOpts(promptFn func() string, history *[]string, opts ReadLineOptions) (string, error) {
 	if !stdinIsTTY() {
 		return readLineFallback(promptFn())
 	}
@@ -33,34 +40,118 @@ func ReadEditedLineFuncHistory(promptFn func() string, history *[]string) (strin
 		return readLineFallback(promptFn())
 	}
 	defer func() {
-		// Re-enable autowrap and bracketed paste before restoring cooked mode.
 		fmt.Print("\033[?7h\033[?2004l")
 		term.Restore(fd, old)
 	}()
 
-	// Bracketed paste: terminals wrap pasted text in ESC[200~ … ESC[201~].
-	// Disable autowrap so long lines redraw on one row (\r\033[K only clears one physical line).
 	fmt.Print("\033[?2004h\033[?7l")
 
-	fmt.Print("\r\033[K" + promptFn())
 	buf := []rune{}
 	pos := 0
 	histIdx := -1
 	var histDraft string
 	pasting := false
+	boxDrawn := false
+	boxMidRows := 0
+	inputCursorLine := 0
 	in := bufio.NewReader(os.Stdin)
 
-	redraw := func() {
+	redrawPlain := func() {
 		fmt.Print("\r\033[K" + promptFn() + string(buf))
 		tail := len(buf) - pos
 		if tail > 0 {
 			fmt.Printf("\033[%dD", tail)
 		}
 	}
+	inputCursorFromBefore := func(before string, inner int) (lineIdx, colInLine int) {
+		segs := WrapBoxContent(before, inner)
+		lineIdx = len(segs) - 1
+		if lineIdx < 0 {
+			lineIdx = 0
+		}
+		colInLine = DisplayWidth(segs[lineIdx])
+		return lineIdx, colInLine
+	}
+	placeInputCursor := func(midRows, lineIdx, colInLine int) {
+		up := midRows + 1 - lineIdx
+		fmt.Printf("\033[%dA\r", up)
+		fmt.Printf("\033[%dC", 1+colInLine)
+		inputCursorLine = lineIdx
+	}
+	moveBelowInputBox := func() {
+		if !boxDrawn {
+			return
+		}
+		down := boxMidRows - inputCursorLine
+		if down > 0 {
+			fmt.Printf("\033[%dB", down)
+		}
+		fmt.Print("\033[1B\r")
+	}
+	eraseInputBoxLines := func(midRows int) {
+		for i := 0; i < midRows+2; i++ {
+			fmt.Print("\033[1A\r\033[K")
+		}
+	}
+	printInputBox := func(top string, mids []string, bot string) {
+		fmt.Println(top)
+		for _, m := range mids {
+			fmt.Println(m)
+		}
+		fmt.Println(bot)
+	}
+	redrawBoxed := func() {
+		w := boxWidth()
+		inner := boxInnerWidth(w)
+		mode := promptChrome
+		content := promptFn() + string(buf)
+		mids := boxSideLinesFromContent(mode, w, content)
+		top := boxTopLine(mode, w)
+		bot := boxBottomLine(mode, w)
+		before := promptFn() + string(buf[:pos])
+		lineIdx, colInLine := inputCursorFromBefore(before, inner)
+
+		if boxDrawn {
+			moveBelowInputBox()
+			eraseInputBoxLines(boxMidRows)
+		}
+
+		printInputBox(top, mids, bot)
+		boxMidRows = len(mids)
+		boxDrawn = true
+		placeInputCursor(boxMidRows, lineIdx, colInLine)
+	}
+	redraw := func() {
+		if opts.Boxed {
+			redrawBoxed()
+		} else {
+			redrawPlain()
+		}
+	}
 	redrawMaybe := func() {
 		if !pasting {
 			redraw()
 		}
+	}
+	clearInputBox := func() {
+		if opts.Boxed && boxDrawn {
+			moveBelowInputBox()
+			eraseInputBoxLines(boxMidRows)
+			boxDrawn = false
+			boxMidRows = 0
+			inputCursorLine = 0
+		} else {
+			fmt.Print("\r\033[K")
+		}
+	}
+	finishLine := func(line string) (string, error) {
+		clearInputBox()
+		fmt.Println()
+		if opts.ResponseRuleOnSubmit && strings.TrimSpace(line) != "" {
+			PrintResponseRule()
+		}
+		appendLineHistory(history, line)
+		return line, nil
 	}
 
 	setBuf := func(s string) {
@@ -75,13 +166,19 @@ func ReadEditedLineFuncHistory(promptFn func() string, history *[]string) (strin
 	}
 
 	endNotices := BeginPromptNotices(func(lines ...string) {
-		fmt.Print("\r\033[K")
+		if opts.Boxed && boxDrawn {
+			clearInputBox()
+		} else {
+			fmt.Print("\r\033[K")
+		}
 		for _, line := range lines {
 			fmt.Println(line)
 		}
 		redraw()
 	})
 	defer endNotices()
+
+	redraw()
 
 	for {
 		b, err := in.ReadByte()
@@ -104,16 +201,15 @@ func ReadEditedLineFuncHistory(promptFn func() string, history *[]string) (strin
 			if pasting {
 				continue
 			}
-			fmt.Print("\r\033[K\n")
-			line := string(buf)
-			appendLineHistory(history, line)
-			return line, nil
+			return finishLine(string(buf))
 		case 3: // Ctrl+C
-			fmt.Print("\r\033[K\n")
+			clearInputBox()
+			fmt.Println()
 			return "", fmt.Errorf("interrupted")
 		case 4: // Ctrl+D
 			if len(buf) == 0 {
-				fmt.Print("\r\033[K\n")
+				clearInputBox()
+				fmt.Println()
 				return "", io.EOF
 			}
 		case 23: // Ctrl+W
@@ -132,9 +228,15 @@ func ReadEditedLineFuncHistory(promptFn func() string, history *[]string) (strin
 				redrawMaybe()
 			}
 		case 27: // ESC
-			seq, err := readEscapeSeq(in)
+			seq, bare, err := readEscapeSeqMaybeBare(in)
 			if err != nil {
 				return "", err
+			}
+			if bare {
+				if opts.CancelOnEsc {
+					return finishLine("")
+				}
+				continue
 			}
 			switch seq {
 			case "[200~":
@@ -312,6 +414,58 @@ func readUTF8Rune(in *bufio.Reader, first byte) (rune, error) {
 		buf = append(buf, more)
 		if len(buf) > utf8.UTFMax {
 			return utf8.RuneError, nil
+		}
+	}
+}
+
+func readEscapeSeqMaybeBare(in *bufio.Reader) (seq string, bare bool, err error) {
+	if in.Buffered() > 0 {
+		s, e := readEscapeSeq(in)
+		return s, false, e
+	}
+	if err := os.Stdin.SetReadDeadline(time.Now().Add(30 * time.Millisecond)); err == nil {
+		b, e := in.ReadByte()
+		_ = os.Stdin.SetReadDeadline(time.Time{})
+		if e != nil {
+			if ne, ok := e.(net.Error); ok && ne.Timeout() {
+				return "", true, nil
+			}
+			return "", false, e
+		}
+		s, e := consumeEscapeFromByte(in, b)
+		return s, false, e
+	}
+	s, e := readEscapeSeq(in)
+	return s, false, e
+}
+
+func consumeEscapeFromByte(in *bufio.Reader, b byte) (string, error) {
+	if b == 'O' {
+		c, err := in.ReadByte()
+		if err != nil {
+			return "", err
+		}
+		return "O" + string([]byte{c}), nil
+	}
+	if b != '[' {
+		return string([]byte{27, b}), nil
+	}
+	var seq []byte
+	seq = append(seq, '[')
+	for {
+		c, err := in.ReadByte()
+		if err != nil {
+			return "", err
+		}
+		seq = append(seq, c)
+		if c == '~' {
+			return string(seq), nil
+		}
+		if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') {
+			return string(seq), nil
+		}
+		if len(seq) > 16 {
+			return string(seq), nil
 		}
 	}
 }

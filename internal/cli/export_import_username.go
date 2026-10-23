@@ -20,7 +20,7 @@ func promptIncludeUsername(action string, username string) (bool, error) {
 	})
 	fmt.Println()
 	for {
-		line, err := ui.ReadEditedLine(ui.Prompt())
+		line, err := ui.ReadMenuLine()
 		if err != nil {
 			return false, err
 		}

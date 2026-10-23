@@ -90,26 +90,7 @@ func parseTcKillID(s string) (int, error) {
 }
 
 func printTerminalJobs(projectID string) error {
-	list, err := jobs.Reap(projectID)
-	if err != nil {
-		return err
-	}
-	if len(list) == 0 {
-		fmt.Println(ui.Dim("no terminals running (tk · tk -a · t -k 1)"))
-		return nil
-	}
-	fmt.Println(ui.Header("TERMINALS:"))
-	for i, j := range list {
-		age := time.Since(j.Started).Round(time.Second)
-		fmt.Printf("  %d) %s  pid %d  %s  %s\n",
-			i+1,
-			ui.Abbrev(j.Alias),
-			j.PID,
-			ui.Dim(age.String()),
-			ui.Dim(truncateRunes(j.Shell, 40)),
-		)
-	}
-	fmt.Println(ui.Dim("tk · tk -a · t -k 1 · tr"))
+	printRunningTerminalsDetail(projectID)
 	return nil
 }
 

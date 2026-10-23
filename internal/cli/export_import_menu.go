@@ -29,34 +29,23 @@ type exportImportSection struct {
 }
 
 func printExportImportMenu(title string, sections []exportImportSection) {
-	fmt.Println()
-	fmt.Printf("%s\n", ui.Header(title))
-	maxNum, maxName := 0, 0
+	var panelSections []menuPanelSection
 	for _, sec := range sections {
+		var rows []numberedMenuRow
 		for _, it := range sec.items {
-			numLen := len(strconv.Itoa(it.Num))
-			if numLen > maxNum {
-				maxNum = numLen
-			}
-			if len(it.Name) > maxName {
-				maxName = len(it.Name)
-			}
+			rows = append(rows, numberedMenuRow{
+				Num:      strconv.Itoa(it.Num),
+				Desc:     it.Name,
+				HelpLine: it.Desc,
+			})
 		}
-	}
-	for i, sec := range sections {
-		if i > 0 {
-			fmt.Println()
-		}
-		fmt.Printf("%s\n", ui.SubHeader(sec.title))
-		for _, it := range sec.items {
-			numCol := ui.Bold(padPlain(strconv.Itoa(it.Num), maxNum))
-			nameCol := ui.Bold(padPlain(it.Name, maxName))
-			fmt.Printf("    %s | %s | %s\n", numCol, nameCol, ui.Dim(it.Desc))
-		}
+		panelSections = append(panelSections, menuPanelSection{
+			Label: sec.title,
+			Rows:  rows,
+		})
 	}
 	fmt.Println()
-	fmt.Printf("    %s\n", ui.Dim("number or name — Enter or 0 or q = back"))
-	fmt.Println()
+	printChoiceMenuPanel(title, []string{"number or name — Enter or 0 or q = back"}, panelSections, nil)
 }
 
 func isExportImportBack(line string) bool {
@@ -78,7 +67,7 @@ func readExportImportChoice(sections []exportImportSection) (key string, back bo
 		items = append(items, sec.items...)
 	}
 	for {
-		line, err := ui.ReadEditedLine(ui.Prompt())
+		line, err := ui.ReadMenuLine()
 		if err != nil {
 			return "", false, err
 		}

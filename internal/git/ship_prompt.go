@@ -44,7 +44,7 @@ func PromptSuspiciousFiles(paths []string) (SuspiciousAction, error) {
 	fmt.Printf("    %s | %s | %s\n", ui.Bold("3"), ui.Abbrev(" "), "commit without these files and add them to .gitignore")
 	fmt.Println()
 	for {
-		line, err := ui.ReadEditedLine(ui.Prompt())
+		line, err := ui.ReadMenuLine()
 		if err != nil {
 			return 0, err
 		}

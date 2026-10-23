@@ -1,11 +1,9 @@
 package cli
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/Cimmerial/tps/internal/config"
-	"github.com/Cimmerial/tps/internal/ui"
 )
 
 func commandDescription(c config.Command) string {
@@ -34,20 +32,6 @@ func commandColumnWidths(cmds []config.Command) (maxCmd, maxAbbrev, maxDesc int,
 	return maxCmd, maxAbbrev, maxDesc, hasAbbrev
 }
 
-func formatCommandTableRow(c config.Command, maxCmd, maxAbbrev int, hasAbbrev bool) string {
-	cmdCol := ui.Bold(padPlain(c.Alias, maxCmd))
-	descCol := ui.Dim(commandDescription(c))
-	if !hasAbbrev {
-		return fmt.Sprintf("%s | %s", cmdCol, descCol)
-	}
-	abbrPlain := padPlain(c.Abbrev, maxAbbrev)
-	abbrCol := abbrPlain
-	if strings.TrimSpace(c.Abbrev) != "" {
-		abbrCol = ui.Abbrev(padPlain(c.Abbrev, maxAbbrev))
-	}
-	return fmt.Sprintf("%s | %s | %s", cmdCol, abbrCol, descCol)
-}
-
 func tagFolderLabel(tag string) string {
 	if strings.TrimSpace(tag) == "" {
 		return "general"
@@ -56,21 +40,7 @@ func tagFolderLabel(tag string) string {
 }
 
 func printHelpProjectCommands(p *config.Project) {
-	groups := p.CommandsByTag()
-	if len(groups) == 0 {
-		return
-	}
-	fmt.Printf("%s\n", ui.Header("project commands"))
-	for i, g := range groups {
-		if i > 0 {
-			fmt.Println()
-		}
-		fmt.Printf("%s\n", ui.SubHeader("tag: "+tagFolderLabel(g.Tag)))
-		maxCmd, maxAbbrev, _, hasAbbrev := commandColumnWidths(g.Commands)
-		for _, c := range g.Commands {
-			fmt.Printf("    %s\n", formatCommandTableRow(c, maxCmd, maxAbbrev, hasAbbrev))
-		}
-	}
+	printProjectCommandsGrouped(p, "project commands")
 }
 
 func printProjectCommandsGrouped(p *config.Project, title string) {
@@ -78,15 +48,24 @@ func printProjectCommandsGrouped(p *config.Project, title string) {
 	if len(groups) == 0 {
 		return
 	}
-	fmt.Printf("%s\n", ui.Header(title))
-	for i, g := range groups {
-		if i > 0 {
-			fmt.Println()
-		}
-		fmt.Printf("%s\n", ui.SubHeader(tagFolderLabel(g.Tag)))
-		maxCmd, maxAbbrev, _, hasAbbrev := commandColumnWidths(g.Commands)
+	var sections []menuPanelSection
+	for _, g := range groups {
+		_, _, _, hasAbbrev := commandColumnWidths(g.Commands)
+		var rows []numberedMenuRow
 		for _, c := range g.Commands {
-			fmt.Printf("    %s\n", formatCommandTableRow(c, maxCmd, maxAbbrev, hasAbbrev))
+			row := numberedMenuRow{
+				Desc:     c.Alias,
+				HelpLine: commandDescription(c),
+			}
+			if hasAbbrev {
+				row.Abbrev = c.Abbrev
+			}
+			rows = append(rows, row)
 		}
+		sections = append(sections, menuPanelSection{
+			Label: strings.ToUpper(tagFolderLabel(g.Tag)),
+			Rows:  rows,
+		})
 	}
+	printSessionMenuPanel(title, sections)
 }

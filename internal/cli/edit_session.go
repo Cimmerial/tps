@@ -194,7 +194,7 @@ func finishEditSession(projectID string, statusTick int, start map[string]comman
 		return nil
 	}
 	fmt.Println()
-	fmt.Println(ui.Header("EDIT CHANGES:"))
+	fmt.Println(ui.HeaderInfo("EDIT CHANGES:"))
 	for _, line := range changes {
 		fmt.Printf("  - %s\n", line)
 	}
@@ -242,11 +242,11 @@ func runEditMenu(reader *bufio.Reader, cfg *config.Config, projectID string, sta
 		}
 		if len(p.Commands) == 0 {
 			fmt.Println()
-			fmt.Printf("%s\n", ui.Header("edit"))
+			fmt.Printf("%s\n", ui.HeaderChoice("edit"))
 			fmt.Println()
 			fmt.Println(ui.Dim("no commands yet"))
 			fmt.Println()
-			printNumberedMenuRows([]numberedMenuRow{
+			printChoiceEditMenuPanel("", nil, []numberedMenuRow{
 				{Num: "1", Desc: ui.Dim("add command")},
 				{Num: "0", Abbrev: "q", Desc: ui.Dim("done")},
 			})
@@ -266,11 +266,6 @@ func runEditMenu(reader *bufio.Reader, cfg *config.Config, projectID string, sta
 		}
 
 		cmds := editCommandList(p)
-		fmt.Println()
-		fmt.Printf("%s\n", ui.Header("edit"))
-		fmt.Println()
-		fmt.Printf("    %s\n", ui.Dim("numbered choices — 0 or q = done"))
-		fmt.Println()
 		rows := make([]numberedMenuRow, len(cmds))
 		for i, c := range cmds {
 			desc := editCommandRowDesc(c)
@@ -280,11 +275,14 @@ func runEditMenu(reader *bufio.Reader, cfg *config.Config, projectID string, sta
 				Desc:   desc,
 			}
 		}
-		printNumberedMenuRows(rows)
-		fmt.Println()
 		addNum := len(cmds) + 1
 		tagNum := len(cmds) + 2
-		printNumberedMenuRows([]numberedMenuRow{
+		fmt.Println()
+		fmt.Printf("%s\n", ui.HeaderChoice("edit"))
+		fmt.Println()
+		printChoiceEditMenuPanel("", []menuPanelSection{{Rows: rows}}, nil)
+		fmt.Println()
+		printChoiceEditMenuPanel("", nil, []numberedMenuRow{
 			{Num: fmt.Sprintf("%d", addNum), Desc: ui.Dim("add command")},
 			{Num: fmt.Sprintf("%d", tagNum), Desc: ui.Dim("manage tags")},
 			{Num: "0", Abbrev: "q", Desc: ui.Dim("done")},
@@ -355,7 +353,7 @@ func editCommandSubmenu(reader *bufio.Reader, projectID, alias string) error {
 		alias = cmd.Alias
 		if instance.IsNonEditableDevProjectCommand(p, alias) {
 			fmt.Println()
-			fmt.Printf("%s\n", ui.Header("edit"))
+			fmt.Printf("%s\n", ui.HeaderChoice("edit"))
 			fmt.Println()
 			fmt.Println(ui.Dim("that command is built into tps and cannot be edited here"))
 			fmt.Println()
@@ -363,15 +361,17 @@ func editCommandSubmenu(reader *bufio.Reader, projectID, alias string) error {
 		}
 
 		fmt.Println()
-		fmt.Printf("%s\n", ui.Header("edit"))
-		fmt.Println()
-		fmt.Printf("%s\n", ui.SubHeader(alias))
-		fmt.Println()
-		fmt.Printf("    %s\n", ui.Dim("numbered choices — 0 or q = back"))
+		fmt.Printf("%s\n", ui.HeaderChoice("editing: "+alias))
 		fmt.Println()
 		subRows := editCommandSubmenuRows(*cmd)
-		subRows = append(subRows, numberedMenuRow{Num: "0", Desc: ui.Dim("back (q)")})
-		printNumberedMenuRows(subRows)
+		mainRows := subRows[:len(subRows)-1]
+		footer := []numberedMenuRow{
+			subRows[len(subRows)-1],
+			{Num: "0", Desc: ui.Dim("back (q)")},
+		}
+		printChoiceEditMenuPanel("", []menuPanelSection{{Rows: mainRows}}, nil)
+		fmt.Println()
+		printChoiceEditMenuPanel("", nil, footer)
 		fmt.Println()
 
 		choice, back, err := readOptionsMenuChoice()
@@ -541,14 +541,14 @@ func editCommandSubmenuRows(cmd config.Command) []numberedMenuRow {
 		{Num: "4", Status: editFieldSetMark(descSet), Desc: ui.Dim("description"), HelpLine: editHelpIf(descSet, cmd.Description)},
 		{Num: "5", Status: editFieldSetMark(tagsSet), Desc: ui.Dim("tags"), HelpLine: editHelpIf(tagsSet, tagsLabel(cmd.Tags))},
 		{Num: "6", Status: editFieldSetMark(precSet), Desc: ui.Dim("precursor"), HelpLine: editHelpIf(precSet, cmd.Precursor)},
-		{Num: "7", Status: editFieldSetMark(detached), Desc: ui.Dim("detach / terminal"), HelpLine: detachHelp},
+		{Num: "7", Status: editFieldSetMark(detached), Desc: ui.Dim("detach / terminal"), HelpLine: editMenuHelpLine(detachHelp)},
 	}
 	if editCommandShowsCloseOnComplete(cmd) {
 		rows = append(rows, numberedMenuRow{
 			Num:      "8",
 			Status:   editFieldSetMark(cmd.CloseOnComplete),
 			Desc:     ui.Dim("kill detachment after completion"),
-			HelpLine: editCloseOnCompleteHelp(cmd),
+			HelpLine: editMenuHelpLine(editCloseOnCompleteHelp(cmd)),
 		})
 	}
 	capNum := len(rows) + 1
@@ -560,11 +560,18 @@ func editCommandSubmenuRows(cmd config.Command) []numberedMenuRow {
 	return rows
 }
 
+func editMenuHelpLine(s string) string {
+	if strings.TrimSpace(s) == "" {
+		return ""
+	}
+	return ui.BrightBlue(s)
+}
+
 func editHelpIf(set bool, val string) string {
 	if !set {
 		return ""
 	}
-	return editTruncateDisplay(val, 56)
+	return editMenuHelpLine(editTruncateDisplay(val, 56))
 }
 
 func editPromptErr(err error) error {
@@ -595,20 +602,22 @@ func editMutateCommand(projectID, alias string, mutate func(*config.Command)) er
 	return config.Save(cfg)
 }
 
-func editPromptField(reader *bufio.Reader, field, current string, allowClear bool) (string, bool, error) {
-	fmt.Println()
-	cur := emptyDash(current)
-	if cur != ui.SymbolEmDash {
-		fmt.Printf("current %s: %s\n", field, ui.Faint(cur))
-	} else {
-		fmt.Printf("current %s: %s\n", field, ui.Dim(ui.SymbolEmDash))
-	}
+func editFieldInputHint(allowClear bool) string {
 	if allowClear {
-		fmt.Println(ui.Dim("Enter to keep · - to clear"))
-	} else {
-		fmt.Println(ui.Dim("Enter to keep"))
+		return "click Enter to keep current option, input \"-\" to clear field"
 	}
-	line, err := ui.ReadEditedLine(fmt.Sprintf("new %s: ", field))
+	return "click Enter to keep current option"
+}
+
+func readEditNewLine() (string, error) {
+	ui.SetPromptChrome(ui.ChromeChoice)
+	return ui.ReadEditedLine(ui.NewValuePrompt())
+}
+
+func editPromptField(reader *bufio.Reader, field, current string, allowClear bool) (string, bool, error) {
+	printEditFieldPromptPanel(field, editFieldInputHint(allowClear), current)
+	fmt.Println()
+	line, err := readEditNewLine()
 	if err != nil {
 		return "", false, editPromptErr(err)
 	}
@@ -766,7 +775,7 @@ func editToggleCloseOnComplete(projectID, alias string, cmd *config.Command) err
 func editConfirmDelete(reader *bufio.Reader, alias string) (bool, error) {
 	ui.ClearScreen()
 	fmt.Println()
-	fmt.Printf("%s\n", ui.Header("edit"))
+	fmt.Printf("%s\n", ui.HeaderChoice("edit"))
 	fmt.Println()
 	fmt.Printf("    %s\n", ui.Red(fmt.Sprintf("delete command %q?", alias)))
 	fmt.Println()
@@ -809,17 +818,45 @@ func editNextDraftAlias(p *config.Project) string {
 	}
 }
 
+func editCommandIsUntouchedDraft(cmd config.Command, draftAlias string) bool {
+	if !strings.EqualFold(strings.TrimSpace(cmd.Alias), draftAlias) {
+		return false
+	}
+	if cmd.HasAnyShellLine() || cmd.Abbrev != "" || cmd.Precursor != "" || cmd.Capture != "" || len(cmd.Tags) > 0 {
+		return false
+	}
+	if editDescriptionIsSet(cmd) || cmd.Handler != "" || cmd.Menu != "" {
+		return false
+	}
+	if cmd.Detach || cmd.ForceForeground || cmd.CloseOnComplete {
+		return false
+	}
+	return true
+}
+
 func editAddCommand(reader *bufio.Reader, cfg *config.Config, projectID string) error {
 	p := cfg.FindByID(projectID)
 	if p == nil {
 		return fmt.Errorf("project not found")
 	}
-	alias := editNextDraftAlias(p)
-	p.Commands = append(p.Commands, config.Command{Alias: alias})
+	draftAlias := editNextDraftAlias(p)
+	p.Commands = append(p.Commands, config.Command{Alias: draftAlias})
 	if err := config.Save(cfg); err != nil {
 		return err
 	}
-	return editCommandSubmenu(reader, projectID, alias)
+	if err := editCommandSubmenu(reader, projectID, draftAlias); err != nil {
+		return err
+	}
+	p = cfg.FindByID(projectID)
+	if p == nil {
+		return nil
+	}
+	cmd := p.FindCommand(draftAlias)
+	if cmd != nil && editCommandIsUntouchedDraft(*cmd, draftAlias) {
+		p.RemoveCommand(draftAlias)
+		return config.Save(cfg)
+	}
+	return nil
 }
 
 func editManageTags(reader *bufio.Reader, projectID string) error {
@@ -831,7 +868,7 @@ func editManageTags(reader *bufio.Reader, projectID string) error {
 		}
 		tags := p.ProjectTags()
 		fmt.Println()
-		fmt.Printf("%s\n", ui.Header("edit"))
+		fmt.Printf("%s\n", ui.HeaderChoice("edit"))
 		fmt.Println()
 		fmt.Printf("%s\n", ui.SubHeader("manage tags"))
 		fmt.Println()

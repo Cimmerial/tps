@@ -30,6 +30,34 @@ func VisibleWidth(s string) int {
 	return n
 }
 
+// DisplayWidth is VisibleWidth plus one column when a braille spinner glyph is present
+// (many terminals render those at width 2 while the rest of the prompt is width 1).
+func DisplayWidth(s string) int {
+	w := VisibleWidth(s)
+	if brailleSpinnerIn(s) {
+		w++
+	}
+	return w
+}
+
+func brailleSpinnerIn(s string) bool {
+	for i := 0; i < len(s); {
+		if s[i] == '\033' {
+			i = skipEscape(s, i)
+			continue
+		}
+		r, size := utf8.DecodeRuneInString(s[i:])
+		if size == 0 {
+			break
+		}
+		if r >= 0x2800 && r <= 0x28FF {
+			return true
+		}
+		i += size
+	}
+	return false
+}
+
 func skipEscape(s string, i int) int {
 	if i >= len(s) || s[i] != '\033' {
 		return i + 1

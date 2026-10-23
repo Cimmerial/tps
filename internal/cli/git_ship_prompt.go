@@ -21,7 +21,7 @@ func promptShipSuspiciousFiles(paths []string) (gittool.SuspiciousAction, error)
 	})
 	fmt.Println()
 	for {
-		line, err := ui.ReadEditedLine(ui.Prompt())
+		line, err := readMenuLine()
 		if err != nil {
 			return 0, err
 		}

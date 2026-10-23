@@ -24,20 +24,69 @@ func syncAddonManifest(cfg *config.Config, p *config.Project) error {
 }
 
 func printAddonsHelpSection() {
+	printInfoMenuPanel("TPS ADDONS", []menuPanelSection{{
+		Label: "install",
+		Rows: []numberedMenuRow{{
+			Desc:     "install utilities",
+			Abbrev:   "iu",
+			HelpLine: "clone and link tps-utilities (folder picker on macOS / Windows)",
+		}},
+	}})
+}
+
+func linkedUtilitiesProjects(cfg *config.Config) []*config.Project {
+	if cfg == nil {
+		return nil
+	}
+	var out []*config.Project
+	for i := range cfg.Projects {
+		p := &cfg.Projects[i]
+		if addon.IsUtilitiesProject(p) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func confirmAnotherUtilitiesInstall(cfg *config.Config) (bool, error) {
+	linked := linkedUtilitiesProjects(cfg)
+	if len(linked) == 0 {
+		return true, nil
+	}
 	fmt.Println()
-	fmt.Printf("%s\n", ui.Header("TPS ADDONS"))
-	fmt.Printf("%s\n", ui.SubHeader("install"))
-	maxCmd, maxAbbrev := len("install utilities"), len("iu")
-	fmt.Printf("    %s | %s | %s\n",
-		ui.Bold(padPlain("install utilities", maxCmd)),
-		ui.Abbrev(padPlain("iu", maxAbbrev)),
-		ui.Dim("clone and link tps-utilities (Finder folder on macOS)"),
-	)
+	fmt.Println(ui.Yellow("tps-utilities is already installed:"))
+	for _, p := range linked {
+		fmt.Printf("    %s  %s\n", ui.Bold(p.Name), ui.Dim(p.Path))
+	}
+	fmt.Println()
+	fmt.Println(ui.Dim("Install another instance? [y/N]"))
+	ui.SetPromptChrome(ui.ChromeChoice)
+	line, err := ui.ReadEditedLine(ui.Prompt())
+	if err != nil {
+		return false, err
+	}
+	if !parseConfirmYes(line) {
+		fmt.Println(ui.Dim("cancelled"))
+		return false, nil
+	}
+	return true, nil
+}
+
+func parseConfirmYes(line string) bool {
+	line = strings.TrimSpace(strings.ToLower(line))
+	return line == "y" || line == "yes"
 }
 
 func runInstallUtilities(cfg *config.Config) error {
 	if cfg == nil {
 		return fmt.Errorf("no config")
+	}
+	ok, err := confirmAnotherUtilitiesInstall(cfg)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
 	}
 	parent, err := pick.ChooseFolder("Choose where to install tps-utilities")
 	if err != nil {

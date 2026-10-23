@@ -8,7 +8,7 @@ import (
 )
 
 func optionsOutputRowDesc(prefs *config.Preferences) string {
-	return ui.Dim("command output") + " — " + optionsRowDescCurrent(outputModeLabel(prefs.SimplifiedOutput))
+	return optionsTopMenuItemDesc("command output", outputModeLabel(prefs.SimplifiedOutput))
 }
 
 func outputModeLabel(simplified bool) string {
@@ -22,7 +22,7 @@ func optionsOutputMenu(prefs *config.Preferences, projectID string, statusTick i
 	ui.ClearScreen()
 	current := prefs.SimplifiedOutput
 	fmt.Println()
-	fmt.Printf("%s\n", ui.Header("options"))
+	fmt.Printf("%s\n", ui.HeaderChoice("options"))
 	fmt.Println()
 	fmt.Printf("%s\n", ui.SubHeader("command output"))
 	fmt.Printf("    %s %s\n", ui.Dim("current:"), ui.Bold(outputModeLabel(current)))

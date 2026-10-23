@@ -9,15 +9,14 @@ import (
 )
 
 func optionsCaptureSMSRowDesc(prefs *config.Preferences) string {
-	base := ui.Dim("capture sms (phone / Shortcuts)")
 	if prefs == nil {
-		return base
+		return optionsTopMenuItemDesc("capture sms (phone / Shortcuts)", "not set")
 	}
 	to := strings.TrimSpace(prefs.SMSTo)
 	if to == "" {
-		return base + ui.Dim(" — not set")
+		return optionsTopMenuItemDesc("capture sms (phone / Shortcuts)", "not set")
 	}
-	return base + ui.Dim(" — ") + ui.Bold(maskSMSTo(to))
+	return optionsTopMenuItemDesc("capture sms (phone / Shortcuts)", maskSMSTo(to))
 }
 
 func optionsCaptureSMSMenu(_ *config.Preferences, projectID string, statusTick int) (bool, error) {
@@ -33,7 +32,7 @@ func optionsCaptureSMSMenu(_ *config.Preferences, projectID string, statusTick i
 		}
 		ui.ClearScreen()
 		fmt.Println()
-		fmt.Printf("%s\n", ui.Header("options"))
+		fmt.Printf("%s\n", ui.HeaderChoice("options"))
 		fmt.Println()
 		fmt.Printf("%s\n", ui.SubHeader("capture sms"))
 		fmt.Printf("    %s %s\n", ui.Dim("saved to:"), ui.Dim(prefsPath))

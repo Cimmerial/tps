@@ -2,16 +2,40 @@ package ui
 
 import "strings"
 
-// Header is a top-level section title (bold, accent color, ALL CAPS).
+// Header is a top-level info section title (bold magenta, ALL CAPS).
 func Header(s string) string {
-	return Bold(paint(accentCode(), strings.ToUpper(strings.TrimSpace(s))))
+	return HeaderInfo(s)
 }
 
-// SubHeader is an indented nested section label (bold, accent color, ALL CAPS; no literal "-").
+// HeaderInfo is a top-level info section title (bold magenta, ALL CAPS).
+func HeaderInfo(s string) string {
+	return Bold(paint(magenta, strings.ToUpper(strings.TrimSpace(s))))
+}
+
+// HeaderChoice is a top-level choice menu title (bold red, ALL CAPS).
+func HeaderChoice(s string) string {
+	return Bold(paint(red, strings.ToUpper(strings.TrimSpace(s))))
+}
+
+// SubHeader is an indented info section label (bold magenta, ALL CAPS).
 func SubHeader(label string) string {
+	return SubHeaderInfo(label)
+}
+
+// SubHeaderInfo is an indented info section label (bold magenta, ALL CAPS).
+func SubHeaderInfo(label string) string {
 	label = strings.TrimSpace(label)
 	if label == "" {
 		label = "general"
 	}
-	return Bold(paint(accentCode(), "  "+strings.ToUpper(label)))
+	return Bold(paint(magenta, strings.ToUpper(label)))
+}
+
+// SubHeaderChoice is an indented choice section label (bold red, ALL CAPS).
+func SubHeaderChoice(label string) string {
+	label = strings.TrimSpace(label)
+	if label == "" {
+		label = "general"
+	}
+	return Bold(paint(red, strings.ToUpper(label)))
 }

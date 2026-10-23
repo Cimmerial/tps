@@ -21,6 +21,13 @@ func TestResolveMenuInputClearVsTps(t *testing.T) {
 	if in.Action != ActionClear || in.ClearScrollback {
 		t.Fatalf("tps: %+v", in)
 	}
+	in, err = resolveMenuInput(nil, &config.Project{}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in.Action != ActionClear || in.ClearScrollback {
+		t.Fatalf("empty line: %+v", in)
+	}
 }
 
 func TestResolveMenuInputVersion(t *testing.T) {
@@ -109,6 +116,18 @@ func TestResolveMenuInputDoc(t *testing.T) {
 		in, err := resolveMenuInput(nil, &config.Project{}, line)
 		if err != nil || in.Action != ActionDoc {
 			t.Fatalf("%q: %+v err=%v", line, in, err)
+		}
+	}
+}
+
+func TestResolveMenuInputNakedNC(t *testing.T) {
+	for _, line := range []string{"nc", "NC", "new command"} {
+		in, err := resolveMenuInput(nil, &config.Project{}, line)
+		if err != nil {
+			t.Fatalf("%q: %v", line, err)
+		}
+		if in.Action != ActionNewCommand || !in.NewCmdEditor {
+			t.Fatalf("%q: %+v", line, in)
 		}
 	}
 }

@@ -9,15 +9,14 @@ import (
 )
 
 func optionsUsernameRowDesc(prefs *config.Preferences) string {
-	base := ui.Dim("username (export filenames)")
 	if prefs == nil {
-		return base
+		return optionsTopMenuItemDesc("username (export filenames)", "not set")
 	}
 	u := strings.TrimSpace(prefs.Username)
 	if u == "" {
-		return base + ui.Dim(" — not set")
+		return optionsTopMenuItemDesc("username (export filenames)", "not set")
 	}
-	return base + ui.Dim(" — ") + ui.Bold(u)
+	return optionsTopMenuItemDesc("username (export filenames)", u)
 }
 
 func optionsPromptUsername(prefs *config.Preferences) error {

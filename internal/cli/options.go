@@ -53,9 +53,6 @@ func optionsSessionChanges(before, after prefSnapshot) []string {
 	if before.titleCardColor != after.titleCardColor {
 		lines = append(lines, formatPrefChange("title card color", before.titleCardColor, after.titleCardColor))
 	}
-	if before.accent != after.accent {
-		lines = append(lines, formatPrefChange("accent", before.accent, after.accent))
-	}
 	if before.colorLabel != after.colorLabel {
 		lines = append(lines, formatPrefChange("color", before.colorLabel, after.colorLabel))
 	}
@@ -100,7 +97,7 @@ func finishOptionsSession(projectID string, statusTick int, start prefSnapshot) 
 		return nil
 	}
 	fmt.Println()
-	fmt.Println(ui.Header("OPTIONS CHANGES:"))
+	fmt.Println(ui.HeaderInfo("OPTIONS CHANGES:"))
 	for _, line := range changes {
 		fmt.Printf("  - %s\n", line)
 	}
@@ -109,9 +106,9 @@ func finishOptionsSession(projectID string, statusTick int, start prefSnapshot) 
 
 func optionsTopMenuRows(prefs *config.Preferences) []numberedMenuRow {
 	rows := []numberedMenuRow{
-		{Num: "1", Desc: ui.Dim("title card logo")},
-		{Num: "2", Desc: ui.Dim("title card color")},
-		{Num: "3", Desc: ui.Dim("terminal colors")},
+		{Num: "1", Desc: optionsLogoTopRowDesc(prefs)},
+		{Num: "2", Desc: optionsTitleCardColorTopRowDesc(prefs)},
+		{Num: "3", Desc: optionsColorModeTopRowDesc(prefs)},
 		{Num: "4", Desc: optionsOutputRowDesc(prefs)},
 	}
 	if platform.SupportsCaptureSMS() {
@@ -139,7 +136,7 @@ func runOptionsTopMenuChoice(choice int, prefs *config.Preferences, projectID st
 	}
 	n++
 	if choice == n {
-		changed, err = optionsColorsMenu(prefs, projectID, statusTick)
+		changed, err = optionsColorToggleMenu(prefs, projectID, statusTick)
 		return true, changed, err
 	}
 	n++
@@ -188,14 +185,10 @@ func runOptionsMenu(projectID string, statusTick int) error {
 			return err
 		}
 		fmt.Println()
-		fmt.Printf("%s\n", ui.Header("options"))
-		fmt.Println()
-		fmt.Printf("    %s\n", ui.Dim("numbered choices — 0 or q = done"))
-		fmt.Println()
-		printNumberedMenuRows(optionsTopMenuRows(prefs))
-		fmt.Println()
-		printNumberedMenuRows([]numberedMenuRow{
-			{Num: "0", Abbrev: "q", Desc: ui.Dim("done")},
+		printChoiceMenuPanel("options", []string{"numbered choices — 0 or q = done"}, []menuPanelSection{
+			{Rows: optionsTopMenuRows(prefs)},
+		}, []numberedMenuRow{
+			{Num: "0", Abbrev: "q", Desc: "done"},
 		})
 		fmt.Println()
 		choice, back, err := readOptionsMenuChoice()
@@ -225,7 +218,7 @@ func optionsLogoMenu(prefs *config.Preferences, projectID string, statusTick int
 		ui.ClearScreen()
 		current := prefs.LogoID()
 		fmt.Println()
-		fmt.Printf("%s\n", ui.Header("options"))
+		fmt.Printf("%s\n", ui.HeaderChoice("options"))
 		fmt.Println()
 		fmt.Printf("%s\n", ui.SubHeader("title card logo"))
 		fmt.Printf("    %s %s\n", ui.Dim("current:"), ui.Bold(current)+" "+ui.Dim("("+logos.Label(current)+")"))
@@ -274,7 +267,7 @@ func optionsLogoMenu(prefs *config.Preferences, projectID string, statusTick int
 func optionsLogoPreviewApply(prefs *config.Preferences, projectID string, statusTick int, id, current string) (bool, error) {
 	ui.ClearScreen()
 	fmt.Println()
-	fmt.Printf("%s\n", ui.Header("options"))
+	fmt.Printf("%s\n", ui.HeaderChoice("options"))
 	fmt.Println()
 	fmt.Printf("%s\n", ui.SubHeader("title card logo"))
 	fmt.Printf("    %s %s\n", ui.Dim("preview:"), ui.Bold(logos.Label(id)))
@@ -342,7 +335,7 @@ func optionsTitleCardColorMenu(prefs *config.Preferences, projectID string, stat
 	current := prefs.TitleCardColorMode()
 	choices := colorPresetChoices()
 	fmt.Println()
-	fmt.Printf("%s\n", ui.Header("options"))
+	fmt.Printf("%s\n", ui.HeaderChoice("options"))
 	fmt.Println()
 	fmt.Printf("%s\n", ui.SubHeader("title card color"))
 	fmt.Printf("    %s %s\n", ui.Dim("current:"), ui.Bold(current)+" "+ui.PaintColorID(current, current))
@@ -389,97 +382,11 @@ func optionsTitleCardColorMenu(prefs *config.Preferences, projectID string, stat
 	return true, nil
 }
 
-func optionsColorsMenu(prefs *config.Preferences, projectID string, statusTick int) (bool, error) {
-	ui.ClearScreen()
-	fmt.Println()
-	fmt.Printf("%s\n", ui.Header("options"))
-	fmt.Println()
-	fmt.Printf("%s\n", ui.SubHeader("terminal colors"))
-	fmt.Printf("    %s %s\n", ui.Dim("accent:"), ui.Bold(prefs.AccentMode())+" "+ui.PaintColorID(prefs.AccentMode(), prefs.AccentMode()))
-	fmt.Printf("    %s %s\n", ui.Dim("color:"), ui.Bold(colorPrefLabel(prefs.ColorEnabled)))
-	fmt.Println()
-	printNumberedMenuRows([]numberedMenuRow{
-		{Num: "1", Desc: ui.Dim("accent color")},
-		{Num: "2", Desc: ui.Dim("color on/off (auto when unset)")},
-	})
-	fmt.Println()
-	printNumberedMenuRows([]numberedMenuRow{
-		{Num: "0", Abbrev: "q", Desc: ui.Dim("back")},
-	})
-	fmt.Println()
-	choice, back, err := readOptionsMenuChoice()
-	if err != nil || back {
-		return false, err
-	}
-	switch choice {
-	case 1:
-		return optionsAccentMenu(prefs, projectID, statusTick)
-	case 2:
-		return optionsColorToggleMenu(prefs, projectID, statusTick)
-	default:
-		fmt.Println(ui.Dim("invalid choice"))
-		return false, nil
-	}
-}
-
-func optionsAccentMenu(prefs *config.Preferences, projectID string, statusTick int) (bool, error) {
-	ui.ClearScreen()
-	current := prefs.AccentMode()
-	choices := colorPresetChoices()
-	fmt.Println()
-	fmt.Printf("%s\n", ui.Header("options"))
-	fmt.Println()
-	fmt.Printf("%s\n", ui.SubHeader("accent"))
-	fmt.Printf("    %s %s\n", ui.Dim("current:"), ui.Bold(current)+" "+ui.PaintColorID(current, current))
-	fmt.Println()
-	fmt.Printf("    %s\n", ui.Dim("headers, prompts, and menu shortcut keys"))
-	fmt.Println()
-	rows := make([]numberedMenuRow, len(choices))
-	for i, c := range choices {
-		rows[i] = numberedMenuRow{
-			Num:      fmt.Sprintf("%d", i+1),
-			Desc:     optionsColorMenuDesc(c, c.ID == current),
-			HelpLine: colorPresetHelpLine(c.ID),
-		}
-	}
-	printNumberedMenuRows(rows)
-	fmt.Println()
-	printNumberedMenuRows([]numberedMenuRow{
-		{Num: "0", Abbrev: "q", Desc: ui.Dim("no change / back")},
-	})
-	fmt.Println()
-	choice, back, err := readOptionsMenuChoice()
-	if err != nil || back {
-		return false, err
-	}
-	if choice < 1 || choice > len(choices) {
-		fmt.Println(ui.Dim("invalid choice"))
-		return false, nil
-	}
-	id := choices[choice-1].ID
-	if id == current {
-		fmt.Println(ui.Dim("already set"))
-		return false, nil
-	}
-	prefs.Accent = id
-	if err := config.SavePreferences(prefs); err != nil {
-		return false, err
-	}
-	if err := applyUIPreferences(); err != nil {
-		return false, err
-	}
-	fmt.Println(ui.Dim(fmt.Sprintf("accent set to %s", id)))
-	if err := refreshUISession(projectID, statusTick); err != nil {
-		return true, err
-	}
-	return true, nil
-}
-
 func optionsColorToggleMenu(prefs *config.Preferences, projectID string, statusTick int) (bool, error) {
 	ui.ClearScreen()
 	current := prefs.ColorEnabled
 	fmt.Println()
-	fmt.Printf("%s\n", ui.Header("options"))
+	fmt.Printf("%s\n", ui.HeaderChoice("options"))
 	fmt.Println()
 	fmt.Printf("%s\n", ui.SubHeader("color mode"))
 	fmt.Printf("    %s %s\n", ui.Dim("current:"), ui.Bold(colorPrefLabel(current)))
@@ -534,6 +441,35 @@ func optionsRowDescCurrent(label string) string {
 	return ui.Green(label + " (current)")
 }
 
+func optionsTopMenuItemDesc(itemLabel, currentValue string) string {
+	currentValue = strings.TrimSpace(currentValue)
+	if currentValue == "" {
+		currentValue = "(default)"
+	}
+	return ui.Dim(itemLabel) + " — " + optionsRowDescCurrent(currentValue)
+}
+
+func optionsLogoTopRowDesc(prefs *config.Preferences) string {
+	id := prefs.LogoID()
+	label := logos.Label(id)
+	if strings.TrimSpace(id) == "" {
+		label = "default"
+	}
+	return optionsTopMenuItemDesc("title card logo", label)
+}
+
+func optionsTitleCardColorTopRowDesc(prefs *config.Preferences) string {
+	id := prefs.TitleCardColorMode()
+	if strings.TrimSpace(id) == "" {
+		id = "default"
+	}
+	return optionsTopMenuItemDesc("title card color", id)
+}
+
+func optionsColorModeTopRowDesc(prefs *config.Preferences) string {
+	return optionsTopMenuItemDesc("color on/off (auto when unset)", colorPrefLabel(prefs.ColorEnabled))
+}
+
 func optionsRowDescIdle(label string, selected bool) string {
 	if selected {
 		return optionsRowDescCurrent(label)
@@ -574,7 +510,7 @@ func sameColorPref(a, b *bool) bool {
 
 // readOptionsMenuChoice reads a numbered menu line. back is true for 0, q, quit, or exit.
 func readOptionsMenuChoice() (choice int, back bool, err error) {
-	line, err := ui.ReadEditedLine(ui.Prompt())
+	line, err := readMenuLine()
 	if err != nil {
 		return 0, false, err
 	}

@@ -18,7 +18,7 @@ func optionsPreferredBrowserRowDesc(prefs *config.Preferences) string {
 			label = string(current)
 		}
 	}
-	return ui.Dim("preferred browser") + " — " + optionsRowDescCurrent(label)
+	return optionsTopMenuItemDesc("preferred browser", label)
 }
 
 func optionsPreferredBrowserMenu(prefs *config.Preferences, projectID string, statusTick int) (bool, error) {
@@ -38,7 +38,7 @@ func optionsPreferredBrowserMenu(prefs *config.Preferences, projectID string, st
 	}
 
 	fmt.Println()
-	fmt.Printf("%s\n", ui.Header("options"))
+	fmt.Printf("%s\n", ui.HeaderChoice("options"))
 	fmt.Println()
 	fmt.Printf("%s\n", ui.SubHeader("preferred browser"))
 	fmt.Printf("    %s %s\n", ui.Dim("current:"), ui.Bold(optionsPreferredBrowserLabel(current)))
