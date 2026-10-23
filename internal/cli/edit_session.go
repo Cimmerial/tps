@@ -19,6 +19,7 @@ type commandSnap struct {
 	Capture     string
 	Detach          bool
 	CloseOnComplete bool
+	FocusDetached   bool
 	Tags            []string
 }
 
@@ -31,6 +32,7 @@ func snapCommand(c config.Command) commandSnap {
 		Capture:     c.Capture,
 		Detach:          c.Detach,
 		CloseOnComplete: c.CloseOnComplete,
+		FocusDetached:   c.FocusDetached,
 		Tags:            append([]string(nil), c.Tags...),
 	}
 }
@@ -67,6 +69,7 @@ func snapsEqual(a, b commandSnap) bool {
 		a.Capture == b.Capture &&
 		a.Detach == b.Detach &&
 		a.CloseOnComplete == b.CloseOnComplete &&
+		a.FocusDetached == b.FocusDetached &&
 		sameTagSlice(a.Tags, b.Tags)
 }
 
@@ -92,6 +95,9 @@ func editCommandSnapDiffs(label string, b, a commandSnap) []string {
 	}
 	if a.CloseOnComplete != b.CloseOnComplete {
 		lines = append(lines, formatPrefChange(label+" close on complete", boolLabel(b.CloseOnComplete), boolLabel(a.CloseOnComplete)))
+	}
+	if a.FocusDetached != b.FocusDetached {
+		lines = append(lines, formatPrefChange(label+" focus detached", boolLabel(b.FocusDetached), boolLabel(a.FocusDetached)))
 	}
 	if !sameTagSlice(a.Tags, b.Tags) {
 		lines = append(lines, formatPrefChange(label+" tags", tagsLabel(b.Tags), tagsLabel(a.Tags)))
@@ -361,6 +367,7 @@ func editCommandSubmenu(reader *bufio.Reader, projectID, alias string) error {
 		}
 
 		fmt.Println()
+		fmt.Println()
 		fmt.Printf("%s\n", ui.HeaderChoice("editing: "+alias))
 		fmt.Println()
 		subRows := editCommandSubmenuRows(*cmd)
@@ -416,6 +423,10 @@ func editCommandSubmenu(reader *bufio.Reader, projectID, alias string) error {
 			}
 		case editCmdMenuCloseOnComplete:
 			if err := editToggleCloseOnComplete(projectID, alias, cmd); err != nil {
+				return err
+			}
+		case editCmdMenuFocusDetached:
+			if err := editToggleFocusDetached(projectID, alias, cmd); err != nil {
 				return err
 			}
 		case editCmdMenuCapture:
@@ -482,8 +493,9 @@ const (
 	editCmdMenuPrecursor       editCmdMenuAction = 6
 	editCmdMenuDetach          editCmdMenuAction = 7
 	editCmdMenuCloseOnComplete editCmdMenuAction = 8
-	editCmdMenuCapture         editCmdMenuAction = 9
-	editCmdMenuDelete          editCmdMenuAction = 10
+	editCmdMenuFocusDetached   editCmdMenuAction = 9
+	editCmdMenuCapture         editCmdMenuAction = 10
+	editCmdMenuDelete          editCmdMenuAction = 11
 )
 
 func editCommandShowsCloseOnComplete(cmd config.Command) bool {
@@ -501,7 +513,7 @@ func editCommandSubmenuActions(cmd config.Command) []editCmdMenuAction {
 		editCmdMenuDetach,
 	}
 	if editCommandShowsCloseOnComplete(cmd) {
-		items = append(items, editCmdMenuCloseOnComplete)
+		items = append(items, editCmdMenuCloseOnComplete, editCmdMenuFocusDetached)
 	}
 	items = append(items, editCmdMenuCapture, editCmdMenuDelete)
 	return items
@@ -525,6 +537,13 @@ func editCloseOnCompleteHelp(cmd config.Command) string {
 	return "close terminal tab when the command exits"
 }
 
+func editFocusDetachedHelp(cmd config.Command) string {
+	if !cmd.FocusDetached {
+		return "open detached terminal in the background (keep focus here)"
+	}
+	return "bring detached terminal to the front when opened"
+}
+
 func editCommandSubmenuRows(cmd config.Command) []numberedMenuRow {
 	shellSet := cmd.HasAnyShellLine()
 	nameSet := strings.TrimSpace(cmd.Alias) != ""
@@ -535,27 +554,33 @@ func editCommandSubmenuRows(cmd config.Command) []numberedMenuRow {
 	capSet := cmd.Capture != ""
 	detached, detachHelp := runner.DetachInfo(cmd)
 	rows := []numberedMenuRow{
-		{Num: "1", Status: editFieldSetMark(shellSet), Desc: ui.Dim("shell"), HelpLine: editHelpIf(shellSet, editShellHelpLine(cmd))},
-		{Num: "2", Status: editFieldSetMark(nameSet), Desc: ui.Dim("name"), HelpLine: editHelpIf(nameSet, cmd.Alias)},
-		{Num: "3", Status: editFieldSetMark(abbrevSet), Desc: ui.Dim("abbreviation"), HelpLine: editHelpIf(abbrevSet, cmd.Abbrev)},
-		{Num: "4", Status: editFieldSetMark(descSet), Desc: ui.Dim("description"), HelpLine: editHelpIf(descSet, cmd.Description)},
-		{Num: "5", Status: editFieldSetMark(tagsSet), Desc: ui.Dim("tags"), HelpLine: editHelpIf(tagsSet, tagsLabel(cmd.Tags))},
-		{Num: "6", Status: editFieldSetMark(precSet), Desc: ui.Dim("precursor"), HelpLine: editHelpIf(precSet, cmd.Precursor)},
-		{Num: "7", Status: editFieldSetMark(detached), Desc: ui.Dim("detach / terminal"), HelpLine: editMenuHelpLine(detachHelp)},
+		{Num: "1", Status: editFieldSetMark(shellSet), Desc: "shell", HelpLine: editHelpIf(shellSet, editShellHelpLine(cmd))},
+		{Num: "2", Status: editFieldSetMark(nameSet), Desc: "name", HelpLine: editHelpIf(nameSet, cmd.Alias)},
+		{Num: "3", Status: editFieldSetMark(abbrevSet), Desc: "abbreviation", HelpLine: editHelpIf(abbrevSet, cmd.Abbrev)},
+		{Num: "4", Status: editFieldSetMark(descSet), Desc: "description", HelpLine: editHelpIf(descSet, cmd.Description)},
+		{Num: "5", Status: editFieldSetMark(tagsSet), Desc: "tags", HelpLine: editHelpIf(tagsSet, tagsLabel(cmd.Tags))},
+		{Num: "6", Status: editFieldSetMark(precSet), Desc: "precursor", HelpLine: editHelpIf(precSet, cmd.Precursor)},
+		{Num: "7", Status: editFieldSetMark(detached), Desc: "detach / terminal", HelpLine: editMenuHelpLine(detachHelp)},
 	}
 	if editCommandShowsCloseOnComplete(cmd) {
 		rows = append(rows, numberedMenuRow{
 			Num:      "8",
 			Status:   editFieldSetMark(cmd.CloseOnComplete),
-			Desc:     ui.Dim("kill detachment after completion"),
+			Desc:     "kill detachment after completion",
 			HelpLine: editMenuHelpLine(editCloseOnCompleteHelp(cmd)),
+		})
+		rows = append(rows, numberedMenuRow{
+			Num:      "9",
+			Status:   editFieldSetMark(cmd.FocusDetached),
+			Desc:     "focus detached terminal",
+			HelpLine: editMenuHelpLine(editFocusDetachedHelp(cmd)),
 		})
 	}
 	capNum := len(rows) + 1
 	delNum := capNum + 1
 	rows = append(rows,
-		numberedMenuRow{Num: fmt.Sprint(capNum), Status: editFieldSetMark(capSet), Desc: ui.Dim("capture"), HelpLine: editHelpIf(capSet, cmd.Capture)},
-		numberedMenuRow{Num: fmt.Sprint(delNum), Desc: ui.Dim("delete command")},
+		numberedMenuRow{Num: fmt.Sprint(capNum), Status: editFieldSetMark(capSet), Desc: "capture", HelpLine: editHelpIf(capSet, cmd.Capture)},
+		numberedMenuRow{Num: fmt.Sprint(delNum), Desc: "delete command"},
 	)
 	return rows
 }
@@ -743,6 +768,7 @@ func editToggleDetach(projectID, alias string, cmd *config.Command) error {
 			c.ForceForeground = true
 			c.Detach = false
 			c.CloseOnComplete = false
+			c.FocusDetached = false
 		}
 	}); err != nil {
 		return err
@@ -755,6 +781,7 @@ func editToggleDetach(projectID, alias string, cmd *config.Command) error {
 		after.ForceForeground = true
 		after.Detach = false
 		after.CloseOnComplete = false
+		after.FocusDetached = false
 	}
 	_, hint := runner.DetachInfo(after)
 	fmt.Println(ui.Dim(hint))
@@ -769,6 +796,17 @@ func editToggleCloseOnComplete(projectID, alias string, cmd *config.Command) err
 		return err
 	}
 	fmt.Println(ui.Dim(editCloseOnCompleteHelp(config.Command{CloseOnComplete: next})))
+	return nil
+}
+
+func editToggleFocusDetached(projectID, alias string, cmd *config.Command) error {
+	next := !cmd.FocusDetached
+	if err := editMutateCommand(projectID, alias, func(c *config.Command) {
+		c.FocusDetached = next
+	}); err != nil {
+		return err
+	}
+	fmt.Println(ui.Dim(editFocusDetachedHelp(config.Command{FocusDetached: next})))
 	return nil
 }
 
@@ -828,7 +866,7 @@ func editCommandIsUntouchedDraft(cmd config.Command, draftAlias string) bool {
 	if editDescriptionIsSet(cmd) || cmd.Handler != "" || cmd.Menu != "" {
 		return false
 	}
-	if cmd.Detach || cmd.ForceForeground || cmd.CloseOnComplete {
+	if cmd.Detach || cmd.ForceForeground || cmd.CloseOnComplete || cmd.FocusDetached {
 		return false
 	}
 	return true

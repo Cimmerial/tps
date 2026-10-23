@@ -100,7 +100,8 @@ func launchShell(p *config.Project, alias, shell string, recordHistory bool) (Jo
 	}
 
 	closeOnComplete := cmd != nil && cmd.CloseOnComplete
-	if err := spawnInTerminal(p.Path, shell, pidPath, logPath, ttyPath); err != nil {
+	focusDetached := cmd != nil && cmd.FocusDetached
+	if err := spawnInTerminal(p.Path, shell, pidPath, logPath, ttyPath, focusDetached); err != nil {
 		return Job{}, err
 	}
 

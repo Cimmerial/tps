@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func spawnInTerminal(workDir, shellCmd, pidFile, logFile, ttyFile string) error {
+func spawnInTerminal(workDir, shellCmd, pidFile, logFile, ttyFile string, focus bool) error {
 	workDir = filepath.Clean(workDir)
 	pidFile = filepath.Clean(pidFile)
 	pgidFile := strings.TrimSuffix(pidFile, ".pid") + ".pgid"

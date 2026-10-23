@@ -26,7 +26,7 @@ nc — add a project command
   nc -n name -a abbrev -c "shell"
   shells:  -c / -shell (repeat, or -c2) · -mac / -darwin · -linux · -win / -windows
   options: -desc text · -tags a,b · -precursor abbrev
-           -t detach · -close · -H handoff · -fg foreground
+           -t detach · -close · -focus · -H handoff · -fg foreground
            -m pattern · -actions print,clipboard,sms
            -handler id · -menu path
   On each OS, tps runs that OS's shells when any are set, and the -c shells otherwise.
@@ -119,6 +119,8 @@ func classifyNCFlag(token string) string {
 		return "description"
 	case "close", "close-on-complete", "close_on_complete":
 		return "close"
+	case "focus", "focus-detached", "focus_detached":
+		return "focus"
 	case "fg", "foreground":
 		return "foreground"
 	case "actions", "action", "capture-actions", "capture_actions":
@@ -240,7 +242,7 @@ func parseNewCommandFlags(fields []string) (config.Command, error) {
 	}
 	var (
 		name, abbrev, desc, capture, tagsRaw, precursor, actionsRaw, handler, menu string
-		detach, handoff, closeOnComplete, foreground                               bool
+		detach, handoff, closeOnComplete, focusDetached, foreground                bool
 		shells                                                                     []ncShellSpec
 	)
 	for i := 0; i < len(fields); i++ {
@@ -355,6 +357,8 @@ func parseNewCommandFlags(fields []string) (config.Command, error) {
 			handoff = true
 		case "close":
 			closeOnComplete = true
+		case "focus":
+			focusDetached = true
 		case "foreground":
 			foreground = true
 		default:
@@ -384,12 +388,17 @@ func parseNewCommandFlags(fields []string) (config.Command, error) {
 	if closeOnComplete {
 		detach = true
 	}
+	if focusDetached {
+		detach = true
+	}
 	if foreground {
 		switch {
 		case capture != "":
 			return config.Command{}, fmt.Errorf("nc: -fg cannot be used with -m")
 		case closeOnComplete:
 			return config.Command{}, fmt.Errorf("nc: -fg cannot be used with -close")
+		case focusDetached:
+			return config.Command{}, fmt.Errorf("nc: -fg cannot be used with -focus")
 		case detach:
 			return config.Command{}, fmt.Errorf("nc: -fg cannot be used with -t")
 		case handoff:
@@ -413,6 +422,7 @@ func parseNewCommandFlags(fields []string) (config.Command, error) {
 		ForceForeground: foreground,
 		Handoff:         handoff,
 		CloseOnComplete: closeOnComplete,
+		FocusDetached:   focusDetached,
 		Capture:         capture,
 		CaptureActions:  actions,
 		Precursor:       precursor,

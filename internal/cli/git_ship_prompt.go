@@ -36,9 +36,10 @@ func promptShipSuspiciousFiles(paths []string) (gittool.SuspiciousAction, error)
 func promptShipFileSelect(dir string, paths []string) ([]string, error) {
 	sel := gittool.NewShipFileSelection(paths)
 	stats := buildShipFileStats(dir, paths)
+	diffs := buildShipFileDiffs(dir, paths, stats)
 	for {
 		ui.ClearScreen()
-		printShipFileBoxes(sel, stats)
+		printShipFileBoxes(sel, stats, diffs)
 		fmt.Println()
 		fmt.Println(ui.Dim("Press c to commit, Enter or 0 to quit, or enter a number to toggle it."))
 		fmt.Println()
@@ -68,13 +69,13 @@ func promptShipFileSelect(dir string, paths []string) ([]string, error) {
 	}
 }
 
-func printShipFileBoxes(sel *gittool.ShipFileSelection, stats map[string]shipFileStat) {
+func printShipFileBoxes(sel *gittool.ShipFileSelection, stats map[string]shipFileStat, diffs map[string]shipFileDiff) {
 	displayNums := shipFileDisplayNumbers(sel.Paths)
 	maxNum := shipFileMaxNumWidth(len(sel.Paths))
 	fmt.Println()
-	printShipFileBox(ui.ChromeCommit, ui.HeaderCommit("BEING COMMITTED:"), sel, true, maxNum, stats, displayNums)
+	printShipFileBox(ui.ChromeCommit, ui.HeaderCommit("BEING COMMITTED:"), sel, true, maxNum, stats, diffs, displayNums)
 	fmt.Println()
-	printShipFileBox(ui.ChromeChoice, ui.HeaderChoice("NOT BEING COMMITTED:"), sel, false, maxNum, stats, displayNums)
+	printShipFileBox(ui.ChromeChoice, ui.HeaderChoice("NOT BEING COMMITTED:"), sel, false, maxNum, stats, diffs, displayNums)
 }
 
 func shipFileMaxNumWidth(fileCount int) int {
@@ -92,7 +93,7 @@ func pathsFromEntries(entries []shipFileTreeEntry) []string {
 	return out
 }
 
-func printShipFileBox(mode ui.ChromeMode, title string, sel *gittool.ShipFileSelection, included bool, maxNum int, stats map[string]shipFileStat, displayNums map[string]int) {
+func printShipFileBox(mode ui.ChromeMode, title string, sel *gittool.ShipFileSelection, included bool, maxNum int, stats map[string]shipFileStat, diffs map[string]shipFileDiff, displayNums map[string]int) {
 	box := ui.NewMenuBox(mode)
 	box.Title(title)
 	var entries []shipFileTreeEntry
@@ -106,16 +107,20 @@ func printShipFileBox(mode ui.ChromeMode, title string, sel *gittool.ShipFileSel
 		box.Plain(ui.SectionTrail{LastSection: true, LastRow: true}, ui.Dim("(none)"))
 	} else {
 		if included {
-			totalLines, totalBytes := sumShipFileStats(pathsFromEntries(entries), stats)
+			added, removed := sumShipFileDiffs(pathsFromEntries(entries), diffs)
 			box.Plain(ui.SectionTrail{LastSection: true, LastRow: false},
-				ui.Gray(shipFileTotalsLabel(totalLines, totalBytes)))
+				shipFileDiffTotalsLabel(added, removed))
 		}
 		treeLines := shipFileTreeLines(buildShipFileTree(entries), func(name string) string {
 			return ui.Blue(name)
 		}, func(_ int, fileName, relPath string) string {
 			num := padPlain(fmt.Sprintf("%d", displayNums[relPath]), maxNum)
 			line := ui.Bold(ui.Red(num)) + ui.Dim("  |  ") + fileName
-			if st, ok := stats[relPath]; ok {
+			if included {
+				if d, ok := diffs[relPath]; ok {
+					line += ui.Dim(" · ") + shipFileDiffLabel(d)
+				}
+			} else if st, ok := stats[relPath]; ok {
 				line += ui.Dim(" · ") + ui.Gray(st.label())
 			}
 			return line

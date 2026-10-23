@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-func spawnInTerminal(workDir, shellCmd, pidFile, logFile, ttyFile string) error {
+func spawnInTerminal(workDir, shellCmd, pidFile, logFile, ttyFile string, focus bool) error {
 	workDir = filepath.Clean(workDir)
 	pidFile = filepath.Clean(pidFile)
 	if err := os.MkdirAll(filepath.Dir(pidFile), 0o700); err != nil {

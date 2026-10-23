@@ -264,11 +264,17 @@ func (b *MenuBox) Plain(trail SectionTrail, text string) {
 	b.lines = append(b.lines, b.treePrefix(trail)+text)
 }
 
-// ChoiceHelpRow adds a value/detail line under a numbered choice (│ └─ connector).
+// ChoiceHelpRow adds an indented value line under a numbered choice (│ continuation, no └ branch).
 func (b *MenuBox) ChoiceHelpRow(parentTrail SectionTrail, text string) {
 	prefix := b.treePrefix(parentTrail)
-	connector := string(treeVert) + "  " + string(treeLast) + string(treeHoriz) + " "
-	b.lines = append(b.lines, prefix+connector+text)
+	branch := string(treeBranch) + string(treeHoriz) + " "
+	connector := string(treeVert) + "  "
+	const pastRowBody = 4
+	pad := len(branch) + pastRowBody - len(connector)
+	if pad < 0 {
+		pad = pastRowBody
+	}
+	b.lines = append(b.lines, prefix+connector+strings.Repeat(" ", pad)+text)
 }
 
 func (b *MenuBox) treePrefix(trail SectionTrail) string {

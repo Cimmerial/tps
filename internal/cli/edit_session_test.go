@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/Cimmerial/tps/internal/config"
-	"github.com/Cimmerial/tps/internal/ui"
 )
 
 func TestEditSessionChangesRename(t *testing.T) {
@@ -93,11 +92,14 @@ func TestEditCommandSubmenuRowsStatus(t *testing.T) {
 		Detach:      true,
 	}
 	rows := editCommandSubmenuRows(cmd)
-	if len(rows) != 10 {
+	if len(rows) != 11 {
 		t.Fatalf("len=%d", len(rows))
 	}
-	if rows[7].Desc != ui.Dim("kill detachment after completion") {
+	if rows[7].Desc != "kill detachment after completion" {
 		t.Fatalf("row 8 = %q", rows[7].Desc)
+	}
+	if rows[8].Desc != "focus detached terminal" {
+		t.Fatalf("row 9 = %q", rows[8].Desc)
 	}
 	if rows[0].HelpLine == "" {
 		t.Fatal("expected shell help")
@@ -114,8 +116,11 @@ func TestEditCommandSubmenuRowsNoCloseWhenForeground(t *testing.T) {
 		t.Fatalf("len=%d", len(rows))
 	}
 	for _, r := range rows {
-		if r.Desc == ui.Dim("kill detachment after completion") {
+		if r.Desc == "kill detachment after completion" {
 			t.Fatal("close-on-complete row should be hidden when not detached")
+		}
+		if r.Desc == "focus detached terminal" {
+			t.Fatal("focus-detached row should be hidden when not detached")
 		}
 	}
 }

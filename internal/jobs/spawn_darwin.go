@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func spawnInTerminal(workDir, shellCmd, pidFile, logFile, ttyFile string) error {
+func spawnInTerminal(workDir, shellCmd, pidFile, logFile, ttyFile string, focus bool) error {
 	workDir = filepath.Clean(workDir)
 	pidFile = filepath.Clean(pidFile)
 	ttyFile = filepath.Clean(ttyFile)
@@ -50,7 +50,11 @@ func spawnInTerminal(workDir, shellCmd, pidFile, logFile, ttyFile string) error 
 	if err := os.WriteFile(launcher, []byte(body), 0o755); err != nil {
 		return err
 	}
-	cmd := exec.Command("open", "-g", "-a", "Terminal", launcher)
+	openArgs := []string{"-a", "Terminal", launcher}
+	if !focus {
+		openArgs = append([]string{"-g"}, openArgs...)
+	}
+	cmd := exec.Command("open", openArgs...)
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }

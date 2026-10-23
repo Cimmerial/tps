@@ -23,6 +23,7 @@ type Command struct {
 	ForceForeground bool `yaml:"foreground,omitempty"` // skip auto-detach heuristics
 	Handoff         bool `yaml:"handoff,omitempty"`    // replace tps with this command in the same terminal
 	CloseOnComplete bool `yaml:"close_on_complete,omitempty"` // close detached terminal tab when the shell command exits
+	FocusDetached   bool `yaml:"focus_detached,omitempty"`    // bring detached terminal to the front when opened (macOS Terminal.app)
 	Capture        string   `yaml:"capture,omitempty"`         // regex or preset (url, trycloudflare, …)
 	CaptureActions []string `yaml:"capture_actions,omitempty"` // print, clipboard, sms
 	Tags        []string `yaml:"tags,omitempty"`    // first tag = menu folder (e.g. admin, git)
