@@ -38,4 +38,11 @@ func TestParseCaptureActions(t *testing.T) {
 	if len(def) != 2 || def[1] != "clipboard" {
 		t.Fatalf("default %v", def)
 	}
+	off := Command{Capture: "url", CaptureDisabled: true, CaptureActions: []string{"sms"}}
+	if off.CaptureActive() || len(off.EffectiveCaptureActions()) != 0 {
+		t.Fatal("disabled capture should not run")
+	}
+	if !off.HasStoredCaptureAction("sms") {
+		t.Fatal("stored sms action")
+	}
 }

@@ -172,6 +172,8 @@ func runInteractive(preferProjectID string) error {
 			if input.NewCmdEditor {
 				if err := editAddCommand(reader, cfg, projectID); err != nil {
 					fmt.Fprintf(os.Stderr, "nc: %v\n", err)
+				} else if err := refreshInteractiveSession(projectID, statusTick, "", false); err != nil {
+					return err
 				}
 				continue
 			}

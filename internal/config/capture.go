@@ -100,9 +100,17 @@ func normalizeCaptureActions(parts []string) []string {
 	return out
 }
 
-// EffectiveCaptureActions returns actions for a command with capture set.
+// CaptureActive is true when capture should run (pattern set and not disabled).
+func (c *Command) CaptureActive() bool {
+	if c == nil {
+		return false
+	}
+	return strings.TrimSpace(c.Capture) != "" && !c.CaptureDisabled
+}
+
+// EffectiveCaptureActions returns actions for a command with capture active.
 func (c *Command) EffectiveCaptureActions() []string {
-	if c == nil || strings.TrimSpace(c.Capture) == "" {
+	if !c.CaptureActive() {
 		return nil
 	}
 	if len(c.CaptureActions) > 0 {
@@ -118,4 +126,27 @@ func (c *Command) HasCaptureAction(name string) bool {
 		}
 	}
 	return false
+}
+
+// HasStoredCaptureAction reports a saved action (for edit UI while capture is off).
+func (c *Command) HasStoredCaptureAction(name string) bool {
+	for _, a := range c.storedCaptureActions() {
+		if a == name {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Command) storedCaptureActions() []string {
+	if c == nil {
+		return nil
+	}
+	if len(c.CaptureActions) > 0 {
+		return normalizeCaptureActions(c.CaptureActions)
+	}
+	if strings.TrimSpace(c.Capture) != "" {
+		return DefaultCaptureActions()
+	}
+	return nil
 }

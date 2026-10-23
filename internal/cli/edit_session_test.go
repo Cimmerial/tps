@@ -125,6 +125,19 @@ func TestEditCommandSubmenuRowsNoCloseWhenForeground(t *testing.T) {
 	}
 }
 
+func TestEditIsAutoDraftAlias(t *testing.T) {
+	for _, alias := range []string{"new", "NEW", "new-2", "new-99"} {
+		if !editIsAutoDraftAlias(alias) {
+			t.Fatalf("expected draft alias %q", alias)
+		}
+	}
+	for _, alias := range []string{"", "newer", "new-x", "not-new"} {
+		if editIsAutoDraftAlias(alias) {
+			t.Fatalf("expected non-draft alias %q", alias)
+		}
+	}
+}
+
 func TestEditCommandIsUntouchedDraft(t *testing.T) {
 	draft := config.Command{Alias: "new"}
 	if !editCommandIsUntouchedDraft(draft, "new") {

@@ -24,6 +24,7 @@ func (c *Command) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	c.CloseOnComplete = boolField(raw, "close_on_complete")
 	c.FocusDetached = boolField(raw, "focus_detached")
 	c.Capture = stringField(raw, "capture")
+	c.CaptureDisabled = boolField(raw, "capture_disabled")
 	c.CaptureActions = ParseCaptureActions(raw["capture_actions"])
 	c.Tags = parseTagsField(raw["tags"])
 	c.Precursor = stringField(raw, "precursor")
@@ -71,6 +72,9 @@ func (c Command) MarshalYAML() (interface{}, error) {
 	}
 	if c.Capture != "" {
 		out["capture"] = c.Capture
+	}
+	if c.CaptureDisabled {
+		out["capture_disabled"] = true
 	}
 	if len(c.CaptureActions) > 0 {
 		out["capture_actions"] = c.CaptureActions

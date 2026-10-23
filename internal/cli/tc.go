@@ -151,7 +151,7 @@ func runTerminalCheck(p *config.Project, in MenuInput) error {
 
 func watchCaptureIfNeeded(p *config.Project, job jobs.Job) bool {
 	cmd := p.FindCommand(job.Alias)
-	if cmd == nil || cmd.Capture == "" {
+	if cmd == nil || !cmd.CaptureActive() {
 		return false
 	}
 	logPath, err := jobs.LogFile(p.ID, job.ID)

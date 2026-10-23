@@ -16,7 +16,8 @@ type commandSnap struct {
 	Abbrev      string
 	Description string
 	Precursor   string
-	Capture     string
+	Capture         string
+	CaptureDisabled bool
 	Detach          bool
 	CloseOnComplete bool
 	FocusDetached   bool
@@ -29,7 +30,8 @@ func snapCommand(c config.Command) commandSnap {
 		Abbrev:      c.Abbrev,
 		Description: c.Description,
 		Precursor:   c.Precursor,
-		Capture:     c.Capture,
+		Capture:         c.Capture,
+		CaptureDisabled: c.CaptureDisabled,
 		Detach:          c.Detach,
 		CloseOnComplete: c.CloseOnComplete,
 		FocusDetached:   c.FocusDetached,
@@ -67,6 +69,7 @@ func snapsEqual(a, b commandSnap) bool {
 		a.Description == b.Description &&
 		a.Precursor == b.Precursor &&
 		a.Capture == b.Capture &&
+		a.CaptureDisabled == b.CaptureDisabled &&
 		a.Detach == b.Detach &&
 		a.CloseOnComplete == b.CloseOnComplete &&
 		a.FocusDetached == b.FocusDetached &&
@@ -87,8 +90,16 @@ func editCommandSnapDiffs(label string, b, a commandSnap) []string {
 	if a.Precursor != b.Precursor {
 		lines = append(lines, formatPrefChange(label+" precursor", emptyDash(b.Precursor), emptyDash(a.Precursor)))
 	}
-	if a.Capture != b.Capture {
-		lines = append(lines, formatPrefChange(label+" capture", emptyDash(b.Capture), emptyDash(a.Capture)))
+	if a.Capture != b.Capture || a.CaptureDisabled != b.CaptureDisabled {
+		before := emptyDash(b.Capture)
+		after := emptyDash(a.Capture)
+		if b.Capture != "" && b.CaptureDisabled {
+			before += " (off)"
+		}
+		if a.Capture != "" && a.CaptureDisabled {
+			after += " (off)"
+		}
+		lines = append(lines, formatPrefChange(label+" capture", before, after))
 	}
 	if a.Detach != b.Detach {
 		lines = append(lines, formatPrefChange(label+" detach", boolLabel(b.Detach), boolLabel(a.Detach)))
@@ -368,7 +379,7 @@ func editCommandSubmenu(reader *bufio.Reader, projectID, alias string) error {
 
 		fmt.Println()
 		fmt.Println()
-		fmt.Printf("%s\n", ui.HeaderChoice("editing: "+alias))
+		fmt.Printf("%s\n", ui.HeaderChoice(editCommandEditTitle(*cmd)))
 		fmt.Println()
 		subRows := editCommandSubmenuRows(*cmd)
 		mainRows := subRows[:len(subRows)-1]
@@ -544,18 +555,49 @@ func editFocusDetachedHelp(cmd config.Command) string {
 	return "bring detached terminal to the front when opened"
 }
 
+func editIsAutoDraftAlias(alias string) bool {
+	alias = strings.TrimSpace(alias)
+	if strings.EqualFold(alias, "new") {
+		return true
+	}
+	const prefix = "new-"
+	if len(alias) <= len(prefix) || !strings.EqualFold(alias[:len(prefix)], prefix) {
+		return false
+	}
+	for _, r := range alias[len(prefix):] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func editCommandEditTitle(cmd config.Command) string {
+	if editIsAutoDraftAlias(cmd.Alias) {
+		return "editing: new command"
+	}
+	return "editing: " + cmd.Alias
+}
+
+func editCommandDisplayName(cmd config.Command) string {
+	if editIsAutoDraftAlias(cmd.Alias) {
+		return ""
+	}
+	return cmd.Alias
+}
+
 func editCommandSubmenuRows(cmd config.Command) []numberedMenuRow {
 	shellSet := cmd.HasAnyShellLine()
-	nameSet := strings.TrimSpace(cmd.Alias) != ""
+	nameSet := strings.TrimSpace(editCommandDisplayName(cmd)) != ""
 	abbrevSet := cmd.Abbrev != ""
 	descSet := editDescriptionIsSet(cmd)
 	tagsSet := len(cmd.Tags) > 0
 	precSet := cmd.Precursor != ""
-	capSet := cmd.Capture != ""
+	capSet := cmd.CaptureActive()
 	detached, detachHelp := runner.DetachInfo(cmd)
 	rows := []numberedMenuRow{
 		{Num: "1", Status: editFieldSetMark(shellSet), Desc: "shell", HelpLine: editHelpIf(shellSet, editShellHelpLine(cmd))},
-		{Num: "2", Status: editFieldSetMark(nameSet), Desc: "name", HelpLine: editHelpIf(nameSet, cmd.Alias)},
+		{Num: "2", Status: editFieldSetMark(nameSet), Desc: "name", HelpLine: editHelpIf(nameSet, editCommandDisplayName(cmd))},
 		{Num: "3", Status: editFieldSetMark(abbrevSet), Desc: "abbreviation", HelpLine: editHelpIf(abbrevSet, cmd.Abbrev)},
 		{Num: "4", Status: editFieldSetMark(descSet), Desc: "description", HelpLine: editHelpIf(descSet, cmd.Description)},
 		{Num: "5", Status: editFieldSetMark(tagsSet), Desc: "tags", HelpLine: editHelpIf(tagsSet, tagsLabel(cmd.Tags))},
@@ -676,7 +718,7 @@ func editPromptField(reader *bufio.Reader, field, current string, allowClear, mu
 }
 
 func editPromptName(reader *bufio.Reader, projectID, alias string, cmd *config.Command) (string, error) {
-	val, ok, err := editPromptField(reader, "name", cmd.Alias, false, false)
+	val, ok, err := editPromptField(reader, "name", editCommandDisplayName(*cmd), false, false)
 	if err != nil {
 		return "", err
 	}
@@ -782,8 +824,6 @@ func editToggleDetach(projectID, alias string, cmd *config.Command) error {
 		} else {
 			c.ForceForeground = true
 			c.Detach = false
-			c.CloseOnComplete = false
-			c.FocusDetached = false
 		}
 	}); err != nil {
 		return err
@@ -795,8 +835,6 @@ func editToggleDetach(projectID, alias string, cmd *config.Command) error {
 	} else {
 		after.ForceForeground = true
 		after.Detach = false
-		after.CloseOnComplete = false
-		after.FocusDetached = false
 	}
 	_, hint := runner.DetachInfo(after)
 	fmt.Println(ui.Dim(hint))
@@ -881,7 +919,7 @@ func editCommandIsUntouchedDraft(cmd config.Command, draftAlias string) bool {
 	if editDescriptionIsSet(cmd) || cmd.Handler != "" || cmd.Menu != "" {
 		return false
 	}
-	if cmd.Detach || cmd.ForceForeground || cmd.CloseOnComplete || cmd.FocusDetached {
+	if cmd.Detach || cmd.ForceForeground || cmd.CloseOnComplete || cmd.FocusDetached || cmd.CaptureDisabled {
 		return false
 	}
 	return true
@@ -900,9 +938,13 @@ func editAddCommand(reader *bufio.Reader, cfg *config.Config, projectID string) 
 	if err := editCommandSubmenu(reader, projectID, draftAlias); err != nil {
 		return err
 	}
-	p = cfg.FindByID(projectID)
-	if p == nil {
-		return nil
+	return editCleanupDraftIfUntouched(projectID, draftAlias)
+}
+
+func editCleanupDraftIfUntouched(projectID, draftAlias string) error {
+	cfg, p, err := loadProject(projectID)
+	if err != nil {
+		return err
 	}
 	cmd := p.FindCommand(draftAlias)
 	if cmd != nil && editCommandIsUntouchedDraft(*cmd, draftAlias) {

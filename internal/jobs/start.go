@@ -91,7 +91,7 @@ func launchShell(p *config.Project, alias, shell string, recordHistory bool) (Jo
 	_ = os.Remove(pgidPath)
 
 	logPath := ""
-	if cmd.Capture != "" {
+	if cmd.CaptureActive() {
 		logPath, err = LogFile(p.ID, id)
 		if err != nil {
 			return Job{}, err

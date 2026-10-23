@@ -24,7 +24,7 @@ func DetachInfo(c config.Command) (detached bool, hint string) {
 	if c.Detach {
 		return true, "opens in a new terminal (detach: true)"
 	}
-	if c.Capture != "" {
+	if c.CaptureActive() {
 		return true, "opens in a new terminal (capture)"
 	}
 	if shellAutoDetaches(primaryShell(c)) {

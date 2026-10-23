@@ -22,21 +22,28 @@ func editCaptureSubmenu(reader *bufio.Reader, projectID, alias string) error {
 			return fmt.Errorf("no command %q", alias)
 		}
 
+		active := cmd.CaptureActive()
 		fmt.Println()
 		fmt.Printf("%s\n", ui.HeaderChoice("edit"))
 		fmt.Printf("%s\n", ui.SubHeaderChoice(alias+" — capture"))
 		fmt.Printf("    %s %s\n", ui.Dim("pattern:"), ui.BrightBlue(emptyDash(cmd.Capture)))
 		fmt.Println()
+
 		captureRows := []numberedMenuRow{
-			{Num: "1", Desc: "capture pattern (preset or regex)"},
-			{Num: "2", Status: editFieldSetMark(cmd.HasCaptureAction(config.CapturePrint)), Desc: "toggle print"},
-			{Num: "3", Status: editFieldSetMark(cmd.HasCaptureAction(config.CaptureClipboard)), Desc: "toggle clipboard"},
+			{Num: "1", Status: editFieldSetMark(active), Desc: "toggle capture"},
+			{Num: "2", Desc: "capture pattern (preset or regex)"},
 		}
-		if platform.SupportsCaptureSMS() {
-			captureRows = append(captureRows, numberedMenuRow{
-				Num: "4", Status: editFieldSetMark(cmd.HasCaptureAction(config.CaptureSMS)),
-				Desc: "toggle sms (set phone in options → capture sms)",
-			})
+		if active {
+			captureRows = append(captureRows,
+				numberedMenuRow{Num: "3", Status: editFieldSetMark(cmd.HasCaptureAction(config.CapturePrint)), Desc: "toggle print"},
+				numberedMenuRow{Num: "4", Status: editFieldSetMark(cmd.HasCaptureAction(config.CaptureClipboard)), Desc: "toggle clipboard"},
+			)
+			if platform.SupportsCaptureSMS() {
+				captureRows = append(captureRows, numberedMenuRow{
+					Num: "5", Status: editFieldSetMark(cmd.HasCaptureAction(config.CaptureSMS)),
+					Desc: "toggle sms (set phone in options → capture sms)",
+				})
+			}
 		}
 		printChoiceEditMenuPanel("", []menuPanelSection{{Rows: captureRows}}, nil)
 		fmt.Println()
@@ -44,7 +51,7 @@ func editCaptureSubmenu(reader *bufio.Reader, projectID, alias string) error {
 			{Num: "0", Desc: ui.Dim("back (q)")},
 		})
 		fmt.Println()
-		if len(cmd.Capture) == 0 {
+		if !active && strings.TrimSpace(cmd.Capture) == "" {
 			fmt.Println(ui.Dim("set a pattern first (e.g. url, trycloudflare)"))
 			fmt.Println()
 		}
@@ -55,18 +62,34 @@ func editCaptureSubmenu(reader *bufio.Reader, projectID, alias string) error {
 		}
 		switch choice {
 		case 1:
-			if err := editPromptCapturePattern(reader, projectID, alias, cmd); err != nil {
+			if err := editToggleCaptureEnabled(projectID, alias, cmd); err != nil {
 				return err
 			}
 		case 2:
-			if err := editToggleCaptureAction(projectID, alias, config.CapturePrint); err != nil {
+			if err := editPromptCapturePattern(reader, projectID, alias, cmd); err != nil {
 				return err
 			}
 		case 3:
-			if err := editToggleCaptureAction(projectID, alias, config.CaptureClipboard); err != nil {
+			if !active {
+				fmt.Println(ui.Dim("invalid choice"))
+				continue
+			}
+			if err := editToggleCaptureAction(projectID, alias, config.CapturePrint); err != nil {
 				return err
 			}
 		case 4:
+			if !active {
+				fmt.Println(ui.Dim("invalid choice"))
+				continue
+			}
+			if err := editToggleCaptureAction(projectID, alias, config.CaptureClipboard); err != nil {
+				return err
+			}
+		case 5:
+			if !active {
+				fmt.Println(ui.Dim("invalid choice"))
+				continue
+			}
 			if !platform.SupportsCaptureSMS() {
 				fmt.Println(ui.Dim("invalid choice"))
 				continue
@@ -78,6 +101,24 @@ func editCaptureSubmenu(reader *bufio.Reader, projectID, alias string) error {
 			fmt.Println(ui.Dim("invalid choice"))
 		}
 	}
+}
+
+func editToggleCaptureEnabled(projectID, alias string, cmd *config.Command) error {
+	next := !cmd.CaptureActive()
+	return editMutateCommand(projectID, alias, func(c *config.Command) {
+		if strings.TrimSpace(c.Capture) == "" {
+			return
+		}
+		if next {
+			c.CaptureDisabled = false
+			c.Detach = true
+			if len(c.CaptureActions) == 0 {
+				c.CaptureActions = config.DefaultCaptureActions()
+			}
+		} else {
+			c.CaptureDisabled = true
+		}
+	})
 }
 
 func editPromptCapturePattern(reader *bufio.Reader, projectID, alias string, cmd *config.Command) error {
@@ -92,19 +133,20 @@ func editPromptCapturePattern(reader *bufio.Reader, projectID, alias string, cmd
 	return editMutateCommand(projectID, alias, func(c *config.Command) {
 		c.Capture = val
 		if val == "" {
-			c.CaptureActions = nil
-		} else {
-			c.Detach = true
-			if len(c.CaptureActions) == 0 {
-				c.CaptureActions = config.DefaultCaptureActions()
-			}
+			c.CaptureDisabled = false
+			return
+		}
+		c.CaptureDisabled = false
+		c.Detach = true
+		if len(c.CaptureActions) == 0 {
+			c.CaptureActions = config.DefaultCaptureActions()
 		}
 	})
 }
 
 func editToggleCaptureAction(projectID, alias, action string) error {
 	return editMutateCommand(projectID, alias, func(c *config.Command) {
-		if strings.TrimSpace(c.Capture) == "" {
+		if !c.CaptureActive() {
 			return
 		}
 		acts := c.CaptureActions
