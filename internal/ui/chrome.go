@@ -13,6 +13,7 @@ const (
 	ChromeInfo    ChromeMode = 0
 	ChromeChoice  ChromeMode = 1
 	ChromeSession ChromeMode = 2 // home session menus (blue box)
+	ChromeCommit  ChromeMode = 3 // ship included files (green box)
 )
 
 var promptChrome = ChromeInfo
@@ -33,6 +34,8 @@ func chromeWire(mode ChromeMode) string {
 		return red
 	case ChromeSession:
 		return blue
+	case ChromeCommit:
+		return green
 	default:
 		return magenta
 	}

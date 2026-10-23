@@ -39,3 +39,8 @@ func SubHeaderChoice(label string) string {
 	}
 	return Bold(paint(red, strings.ToUpper(label)))
 }
+
+// HeaderCommit is a top-level ship-included title (bold green, ALL CAPS).
+func HeaderCommit(s string) string {
+	return Bold(paint(green, strings.ToUpper(strings.TrimSpace(s))))
+}

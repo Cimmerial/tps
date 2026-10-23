@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 
 	gittool "github.com/Cimmerial/tps/internal/git"
@@ -32,8 +33,109 @@ func promptShipSuspiciousFiles(paths []string) (gittool.SuspiciousAction, error)
 	}
 }
 
+func promptShipFileSelect(dir string, paths []string) ([]string, error) {
+	sel := gittool.NewShipFileSelection(paths)
+	stats := buildShipFileStats(dir, paths)
+	for {
+		ui.ClearScreen()
+		printShipFileBoxes(sel, stats)
+		fmt.Println()
+		fmt.Println(ui.Dim("Press c to commit, Enter or 0 to quit, or enter a number to toggle it."))
+		fmt.Println()
+		line, err := readMenuLine()
+		if err != nil {
+			if errors.Is(err, ui.ErrPromptCancelled) {
+				return nil, gittool.ErrShipSelectCancel
+			}
+			return nil, err
+		}
+		commit, quit, num, ok := gittool.ParseShipFileSelectInput(line)
+		if !ok {
+			fmt.Println(ui.Dim("enter c to commit, 0 or Enter to quit, or a number to toggle"))
+			continue
+		}
+		if quit {
+			return nil, gittool.ErrShipSelectCancel
+		}
+		if commit {
+			return sel.IncludedPaths(), nil
+		}
+		path, okPath := shipFilePathForDisplayNumber(sel.Paths, num)
+		if !okPath || !sel.TogglePath(path) {
+			fmt.Println(ui.Dim("invalid number"))
+			continue
+		}
+	}
+}
+
+func printShipFileBoxes(sel *gittool.ShipFileSelection, stats map[string]shipFileStat) {
+	displayNums := shipFileDisplayNumbers(sel.Paths)
+	maxNum := shipFileMaxNumWidth(len(sel.Paths))
+	fmt.Println()
+	printShipFileBox(ui.ChromeCommit, ui.HeaderCommit("BEING COMMITTED:"), sel, true, maxNum, stats, displayNums)
+	fmt.Println()
+	printShipFileBox(ui.ChromeChoice, ui.HeaderChoice("NOT BEING COMMITTED:"), sel, false, maxNum, stats, displayNums)
+}
+
+func shipFileMaxNumWidth(fileCount int) int {
+	if fileCount < 1 {
+		return 0
+	}
+	return len(fmt.Sprintf("%d", fileCount))
+}
+
+func pathsFromEntries(entries []shipFileTreeEntry) []string {
+	out := make([]string, len(entries))
+	for i, e := range entries {
+		out[i] = e.Path
+	}
+	return out
+}
+
+func printShipFileBox(mode ui.ChromeMode, title string, sel *gittool.ShipFileSelection, included bool, maxNum int, stats map[string]shipFileStat, displayNums map[string]int) {
+	box := ui.NewMenuBox(mode)
+	box.Title(title)
+	var entries []shipFileTreeEntry
+	for i, p := range sel.Paths {
+		if sel.Included[i] != included {
+			continue
+		}
+		entries = append(entries, shipFileTreeEntry{Path: p})
+	}
+	if len(entries) == 0 {
+		box.Plain(ui.SectionTrail{LastSection: true, LastRow: true}, ui.Dim("(none)"))
+	} else {
+		if included {
+			totalLines, totalBytes := sumShipFileStats(pathsFromEntries(entries), stats)
+			box.Plain(ui.SectionTrail{LastSection: true, LastRow: false},
+				ui.Gray(shipFileTotalsLabel(totalLines, totalBytes)))
+		}
+		treeLines := shipFileTreeLines(buildShipFileTree(entries), func(name string) string {
+			return ui.Blue(name)
+		}, func(_ int, fileName, relPath string) string {
+			num := padPlain(fmt.Sprintf("%d", displayNums[relPath]), maxNum)
+			line := ui.Bold(ui.Red(num)) + ui.Dim("  |  ") + fileName
+			if st, ok := stats[relPath]; ok {
+				line += ui.Dim(" · ") + ui.Gray(st.label())
+			}
+			return line
+		})
+		for i, line := range treeLines {
+			trail := ui.SectionTrail{LastSection: true, LastRow: i == len(treeLines)-1}
+			box.Plain(trail, line)
+		}
+	}
+	box.Flush()
+}
+
 func runGitShip(dir, message string) (int, error) {
-	return gittool.ShipWithOptions(dir, message, &gittool.ShipOptions{
+	opts := &gittool.ShipOptions{
 		OnSuspicious: promptShipSuspiciousFiles,
-	})
+	}
+	if ui.StdinIsTTY() {
+		opts.OnSelect = func(paths []string) ([]string, error) {
+			return promptShipFileSelect(dir, paths)
+		}
+	}
+	return gittool.ShipWithOptions(dir, message, opts)
 }

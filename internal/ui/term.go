@@ -30,6 +30,11 @@ func stdinIsTTY() bool {
 	return term.IsTerminal(int(os.Stdin.Fd()))
 }
 
+// StdinIsTTY reports whether stdin is an interactive terminal.
+func StdinIsTTY() bool {
+	return stdinIsTTY()
+}
+
 // RestoreStdin returns stdin to cooked mode (e.g. before handing the console to a child process).
 func RestoreStdin() {
 	if !stdinIsTTY() {

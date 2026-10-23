@@ -234,7 +234,9 @@ func ReadEditedLineFuncHistoryWithOpts(promptFn func() string, history *[]string
 			}
 			if bare {
 				if opts.CancelOnEsc {
-					return finishLine("")
+					clearInputBox()
+					fmt.Println()
+					return "", ErrPromptCancelled
 				}
 				continue
 			}

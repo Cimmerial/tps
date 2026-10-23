@@ -1,6 +1,7 @@
 package git
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -33,6 +34,8 @@ func Run(dir string, args []string) (int, error) {
 // ShipOptions configures git ship; nil fields use defaults.
 type ShipOptions struct {
 	OnSuspicious func([]string) (SuspiciousAction, error)
+	// OnSelect chooses paths to stage; nil means stage everything (git add -A).
+	OnSelect func(paths []string) ([]string, error)
 }
 
 func Ship(dir, message string) (int, error) {
@@ -44,12 +47,44 @@ func ShipWithOptions(dir, message string, opts *ShipOptions) (int, error) {
 	if message == "" {
 		return 1, fmt.Errorf("commit message required (example: g ship fix the menu)")
 	}
-	code, err := Run(dir, []string{"add", "-A"})
-	if err != nil {
-		return code, err
-	}
-	if code != 0 {
-		return code, nil
+
+	var (
+		allPaths []string
+		code     int
+		err      error
+	)
+	if opts != nil && opts.OnSelect != nil {
+		allPaths, err = ListChangedPaths(dir)
+		if err != nil {
+			return 1, err
+		}
+		if len(allPaths) == 0 {
+			fmt.Println(ui.Yellow("nothing to commit"))
+			return 0, nil
+		}
+		include, err := opts.OnSelect(allPaths)
+		if err != nil {
+			if errors.Is(err, ErrShipSelectCancel) {
+				fmt.Println(ui.Dim("ship cancelled"))
+				return 0, nil
+			}
+			return 1, err
+		}
+		if len(include) == 0 {
+			fmt.Println(ui.Yellow("nothing to commit"))
+			return 0, nil
+		}
+		if err := StageShipFiles(dir, allPaths, include); err != nil {
+			return 1, err
+		}
+	} else {
+		code, err = Run(dir, []string{"add", "-A"})
+		if err != nil {
+			return code, err
+		}
+		if code != 0 {
+			return code, nil
+		}
 	}
 
 	if stagedEmpty(dir) {
