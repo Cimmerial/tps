@@ -5,6 +5,8 @@ type ReadLineOptions struct {
 	Boxed                bool
 	CancelOnEsc          bool
 	ResponseRuleOnSubmit bool
+	// MultilineShiftEnter: Enter submits; Shift+Enter (and common terminal variants) insert a newline.
+	MultilineShiftEnter bool
 }
 
 // DefaultReadLineOptions is single-line input with no special behavior.

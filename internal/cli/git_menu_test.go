@@ -15,8 +15,9 @@ func TestParseGitShipInput(t *testing.T) {
 		{"g diff --staged", "", false, false},
 		{"gs legacy msg", "legacy msg", true, false},
 		{"git ship hello", "hello", true, false},
-		{"g ship", "", true, true},
-		{"g", "", true, true},
+		{"g ship", "", true, false},
+		{"g", "", true, false},
+		{"git ship", "", true, false},
 	}
 	for _, tc := range tests {
 		msg, ok, err := parseGitShipInput(fieldsFromLine(tc.line))

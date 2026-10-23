@@ -1,9 +1,6 @@
 package cli
 
-import (
-	"fmt"
-	"strings"
-)
+import "strings"
 
 func fieldsFromLine(line string) []string {
 	return strings.Fields(strings.TrimSpace(line))
@@ -32,37 +29,25 @@ func parseGitShipInput(fields []string) (msg string, ok bool, err error) {
 	switch strings.ToLower(fields[0]) {
 	case "gs":
 		if len(fields) < 2 {
-			return "", true, fmt.Errorf("g ship needs a message (example: g ship fix the menu)")
+			return "", true, nil
 		}
 		return strings.TrimSpace(strings.Join(fields[1:], " ")), true, nil
 	case "g":
 		if len(fields) < 2 {
-			return "", true, fmt.Errorf("g needs a git command (example: g status) or ship message (example: g fix the menu)")
+			return "", true, nil
 		}
 		if strings.EqualFold(fields[1], "ship") {
-			msg = strings.TrimSpace(strings.Join(fields[2:], " "))
-			if msg == "" {
-				return "", true, fmt.Errorf("g ship needs a message (example: g ship fix the menu)")
-			}
-			return msg, true, nil
+			return strings.TrimSpace(strings.Join(fields[2:], " ")), true, nil
 		}
 		if isKnownGitSubcommand(fields[1]) {
 			return "", false, nil
 		}
-		msg = strings.TrimSpace(strings.Join(fields[1:], " "))
-		if msg == "" {
-			return "", true, fmt.Errorf("g ship needs a message (example: g fix the menu)")
-		}
-		return msg, true, nil
+		return strings.TrimSpace(strings.Join(fields[1:], " ")), true, nil
 	case "git":
-		if len(fields) < 3 || !strings.EqualFold(fields[1], "ship") {
+		if len(fields) < 2 || !strings.EqualFold(fields[1], "ship") {
 			return "", false, nil
 		}
-		msg = strings.TrimSpace(strings.Join(fields[2:], " "))
-		if msg == "" {
-			return "", true, fmt.Errorf("git ship needs a message (example: git ship fix the menu)")
-		}
-		return msg, true, nil
+		return strings.TrimSpace(strings.Join(fields[2:], " ")), true, nil
 	default:
 		return "", false, nil
 	}

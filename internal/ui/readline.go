@@ -165,6 +165,13 @@ func ReadEditedLineFuncHistoryWithOpts(promptFn func() string, history *[]string
 		histDraft = ""
 	}
 
+	insertNewline := func() {
+		clearHistBrowse()
+		buf = append(buf[:pos], append([]rune{'\n'}, buf[pos:]...)...)
+		pos++
+		redrawMaybe()
+	}
+
 	endNotices := BeginPromptNotices(func(lines ...string) {
 		if opts.Boxed && boxDrawn {
 			clearInputBox()
@@ -329,6 +336,10 @@ func ReadEditedLineFuncHistoryWithOpts(promptFn func() string, history *[]string
 					buf = append(buf[:start], buf[pos:]...)
 					pos = start
 					redrawMaybe()
+				}
+			default:
+				if shiftEnterInsertsNewline(seq, opts.MultilineShiftEnter) {
+					insertNewline()
 				}
 			}
 		default:

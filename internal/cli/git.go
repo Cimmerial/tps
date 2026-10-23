@@ -25,7 +25,6 @@ var gitCmd = &cobra.Command{
 var gitShipCmd = &cobra.Command{
 	Use:   "ship [message]",
 	Short: "choose files, commit, and push",
-	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		root, err := projectRootFromCwd()
 		if err != nil {

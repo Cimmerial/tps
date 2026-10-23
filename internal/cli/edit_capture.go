@@ -81,7 +81,7 @@ func editCaptureSubmenu(reader *bufio.Reader, projectID, alias string) error {
 }
 
 func editPromptCapturePattern(reader *bufio.Reader, projectID, alias string, cmd *config.Command) error {
-	val, ok, err := editPromptField(reader, "capture pattern", cmd.Capture, true)
+	val, ok, err := editPromptField(reader, "capture pattern", cmd.Capture, true, false)
 	if err != nil {
 		return err
 	}

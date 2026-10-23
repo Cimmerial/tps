@@ -627,26 +627,41 @@ func editMutateCommand(projectID, alias string, mutate func(*config.Command)) er
 	return config.Save(cfg)
 }
 
-func editFieldInputHint(allowClear bool) string {
-	if allowClear {
-		return "click Enter to keep current option, input \"-\" to clear field"
+func editFieldInputHint(allowClear, multiline bool) string {
+	var parts []string
+	if multiline {
+		parts = append(parts, "Shift+Enter for a new line, Enter to submit")
 	}
-	return "click Enter to keep current option"
+	if allowClear {
+		parts = append(parts, "Enter on empty input to keep current, \"-\" to clear")
+	} else {
+		parts = append(parts, "Enter on empty input to keep current")
+	}
+	return strings.Join(parts, " · ")
 }
 
-func readEditNewLine() (string, error) {
+func readEditNewLine(multiline bool) (string, error) {
 	ui.SetPromptChrome(ui.ChromeChoice)
-	return ui.ReadEditedLine(ui.NewValuePrompt())
+	opts := ui.DefaultReadLineOptions()
+	opts.MultilineShiftEnter = multiline
+	return ui.ReadEditedLineFuncHistoryWithOpts(func() string { return ui.NewValuePrompt() }, nil, opts)
 }
 
-func editPromptField(reader *bufio.Reader, field, current string, allowClear bool) (string, bool, error) {
-	printEditFieldPromptPanel(field, editFieldInputHint(allowClear), current)
+func trimEditFieldInput(line string, multiline bool) string {
+	if multiline {
+		return strings.TrimSpace(strings.ReplaceAll(line, "\r\n", "\n"))
+	}
+	return strings.TrimSpace(line)
+}
+
+func editPromptField(reader *bufio.Reader, field, current string, allowClear, multiline bool) (string, bool, error) {
+	printEditFieldPromptPanel(field, editFieldInputHint(allowClear, multiline), current)
 	fmt.Println()
-	line, err := readEditNewLine()
+	line, err := readEditNewLine(multiline)
 	if err != nil {
 		return "", false, editPromptErr(err)
 	}
-	line = strings.TrimSpace(line)
+	line = trimEditFieldInput(line, multiline)
 	if line == "" {
 		return "", false, nil
 	}
@@ -661,7 +676,7 @@ func editPromptField(reader *bufio.Reader, field, current string, allowClear boo
 }
 
 func editPromptName(reader *bufio.Reader, projectID, alias string, cmd *config.Command) (string, error) {
-	val, ok, err := editPromptField(reader, "name", cmd.Alias, false)
+	val, ok, err := editPromptField(reader, "name", cmd.Alias, false, false)
 	if err != nil {
 		return "", err
 	}
@@ -690,7 +705,7 @@ func editPromptName(reader *bufio.Reader, projectID, alias string, cmd *config.C
 }
 
 func editPromptAbbrev(reader *bufio.Reader, projectID, alias string, cmd *config.Command) error {
-	val, ok, err := editPromptField(reader, "abbreviation", cmd.Abbrev, true)
+	val, ok, err := editPromptField(reader, "abbreviation", cmd.Abbrev, true, false)
 	if err != nil {
 		return err
 	}
@@ -702,7 +717,7 @@ func editPromptAbbrev(reader *bufio.Reader, projectID, alias string, cmd *config
 }
 
 func editPromptDescription(reader *bufio.Reader, projectID, alias string, cmd *config.Command) error {
-	val, ok, err := editPromptField(reader, "description", cmd.Description, true)
+	val, ok, err := editPromptField(reader, "description", cmd.Description, true, true)
 	if err != nil {
 		return err
 	}
@@ -719,7 +734,7 @@ func editPromptDescription(reader *bufio.Reader, projectID, alias string, cmd *c
 }
 
 func editPromptTags(reader *bufio.Reader, projectID, alias string, cmd *config.Command) error {
-	val, ok, err := editPromptField(reader, "tags", tagsLabel(cmd.Tags), true)
+	val, ok, err := editPromptField(reader, "tags", tagsLabel(cmd.Tags), true, false)
 	if err != nil {
 		return err
 	}
@@ -737,7 +752,7 @@ func editPromptTags(reader *bufio.Reader, projectID, alias string, cmd *config.C
 }
 
 func editPromptPrecursor(reader *bufio.Reader, projectID, alias string, cmd *config.Command) error {
-	val, ok, err := editPromptField(reader, "precursor", cmd.Precursor, true)
+	val, ok, err := editPromptField(reader, "precursor", cmd.Precursor, true, false)
 	if err != nil {
 		return err
 	}

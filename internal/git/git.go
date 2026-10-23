@@ -36,6 +36,8 @@ type ShipOptions struct {
 	OnSuspicious func([]string) (SuspiciousAction, error)
 	// OnSelect chooses paths to stage; nil means stage everything (git add -A).
 	OnSelect func(paths []string) ([]string, error)
+	// CommitMessage, when set, is read after OnSelect returns (interactive ship message).
+	CommitMessage *string
 }
 
 func Ship(dir, message string) (int, error) {
@@ -43,8 +45,9 @@ func Ship(dir, message string) (int, error) {
 }
 
 func ShipWithOptions(dir, message string, opts *ShipOptions) (int, error) {
+	interactive := opts != nil && opts.OnSelect != nil
 	message = strings.TrimSpace(message)
-	if message == "" {
+	if message == "" && !interactive {
 		return 1, fmt.Errorf("commit message required (example: g ship fix the menu)")
 	}
 
@@ -53,7 +56,7 @@ func ShipWithOptions(dir, message string, opts *ShipOptions) (int, error) {
 		code     int
 		err      error
 	)
-	if opts != nil && opts.OnSelect != nil {
+	if interactive {
 		allPaths, err = ListChangedPaths(dir)
 		if err != nil {
 			return 1, err
@@ -76,6 +79,9 @@ func ShipWithOptions(dir, message string, opts *ShipOptions) (int, error) {
 		}
 		if err := StageShipFiles(dir, allPaths, include); err != nil {
 			return 1, err
+		}
+		if opts.CommitMessage != nil {
+			message = strings.TrimSpace(*opts.CommitMessage)
 		}
 	} else {
 		code, err = Run(dir, []string{"add", "-A"})
@@ -128,6 +134,10 @@ func ShipWithOptions(dir, message string, opts *ShipOptions) (int, error) {
 		default:
 			return 1, fmt.Errorf("invalid suspicious-file choice")
 		}
+	}
+
+	if message == "" {
+		return 1, fmt.Errorf("commit message required (set commit name before shipping)")
 	}
 
 	code, err = Run(dir, []string{"commit", "-m", message})

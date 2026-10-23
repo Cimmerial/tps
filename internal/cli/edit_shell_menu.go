@@ -151,7 +151,7 @@ func editPromptShellKey(reader *bufio.Reader, projectID, alias, key string) erro
 	}
 	printEditFieldPromptPanel(key, "click Enter to keep current option, input \"-\" to remove this shell line", cur)
 	fmt.Println()
-	line, err := readEditNewLine()
+	line, err := readEditNewLine(false)
 	if err != nil {
 		return editPromptErr(err)
 	}
@@ -195,7 +195,7 @@ func editPromptAddShell(reader *bufio.Reader, projectID, alias string, platform 
 	)
 	fmt.Println(ui.Dim("key: "+key))
 	fmt.Println()
-	line, err := readEditNewLine()
+	line, err := readEditNewLine(false)
 	if err != nil {
 		return editPromptErr(err)
 	}

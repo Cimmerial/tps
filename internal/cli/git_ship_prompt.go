@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	gittool "github.com/Cimmerial/tps/internal/git"
 	"github.com/Cimmerial/tps/internal/ui"
@@ -33,15 +34,15 @@ func promptShipSuspiciousFiles(paths []string) (gittool.SuspiciousAction, error)
 	}
 }
 
-func promptShipFileSelect(dir string, paths []string) ([]string, error) {
+func promptShipFileSelect(dir string, paths []string, draft *shipCommitDraft) ([]string, error) {
 	sel := gittool.NewShipFileSelection(paths)
 	stats := buildShipFileStats(dir, paths)
 	diffs := buildShipFileDiffs(dir, paths, stats)
 	for {
 		ui.ClearScreen()
-		printShipFileBoxes(sel, stats, diffs)
+		printShipFileBoxes(sel, stats, diffs, draft)
 		fmt.Println()
-		fmt.Println(ui.Dim("Press c to commit, Enter or 0 to quit, or enter a number to toggle it."))
+		fmt.Println(ui.Dim("Press c to commit, Enter or 0 to quit, 1–2 to edit commit message, or a file number to toggle it."))
 		fmt.Println()
 		line, err := readMenuLine()
 		if err != nil {
@@ -52,16 +53,32 @@ func promptShipFileSelect(dir string, paths []string) ([]string, error) {
 		}
 		commit, quit, num, ok := gittool.ParseShipFileSelectInput(line)
 		if !ok {
-			fmt.Println(ui.Dim("enter c to commit, 0 or Enter to quit, or a number to toggle"))
+			fmt.Println(ui.Dim("enter c to commit, 0 or Enter to quit, 1–2 for commit message, or a file number to toggle"))
 			continue
 		}
 		if quit {
 			return nil, gittool.ErrShipSelectCancel
 		}
 		if commit {
+			if strings.TrimSpace(draft.Title) == "" {
+				fmt.Println(ui.Dim("commit name is required (choose 1)"))
+				continue
+			}
 			return sel.IncludedPaths(), nil
 		}
-		path, okPath := shipFilePathForDisplayNumber(sel.Paths, num)
+		switch num {
+		case 1:
+			if err := shipPromptCommitName(draft); err != nil {
+				return nil, err
+			}
+			continue
+		case 2:
+			if err := shipPromptCommitDescription(draft); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		path, okPath := shipFilePathForDisplayNumberOffset(sel.Paths, num, shipCommitMenuSlots)
 		if !okPath || !sel.TogglePath(path) {
 			fmt.Println(ui.Dim("invalid number"))
 			continue
@@ -69,13 +86,43 @@ func promptShipFileSelect(dir string, paths []string) ([]string, error) {
 	}
 }
 
-func printShipFileBoxes(sel *gittool.ShipFileSelection, stats map[string]shipFileStat, diffs map[string]shipFileDiff) {
-	displayNums := shipFileDisplayNumbers(sel.Paths)
-	maxNum := shipFileMaxNumWidth(len(sel.Paths))
+func shipPromptCommitName(draft *shipCommitDraft) error {
+	val, ok, err := editPromptField(nil, "name", draft.Title, false, false)
+	if err != nil {
+		return err
+	}
+	if !ok || strings.TrimSpace(val) == "" {
+		return nil
+	}
+	draft.Title = strings.TrimSpace(val)
+	return nil
+}
+
+func shipPromptCommitDescription(draft *shipCommitDraft) error {
+	val, ok, err := editPromptField(nil, "description", draft.Body, true, true)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+	draft.Body = strings.TrimSpace(val)
+	return nil
+}
+
+func printShipFileBoxes(sel *gittool.ShipFileSelection, stats map[string]shipFileStat, diffs map[string]shipFileDiff, draft *shipCommitDraft) {
+	displayNums := shipFileDisplayNumbersOffset(sel.Paths, shipCommitMenuSlots)
+	maxNum := shipFileMaxNumWidth(len(sel.Paths) + shipCommitMenuSlots)
 	fmt.Println()
 	printShipFileBox(ui.ChromeCommit, ui.HeaderCommit("BEING COMMITTED:"), sel, true, maxNum, stats, diffs, displayNums)
 	fmt.Println()
 	printShipFileBox(ui.ChromeChoice, ui.HeaderChoice("NOT BEING COMMITTED:"), sel, false, maxNum, stats, diffs, displayNums)
+	fmt.Println()
+	printShipCommitPanel(draft)
+}
+
+func printShipCommitPanel(draft *shipCommitDraft) {
+	printChoiceEditMenuPanel("COMMIT MESSAGE:", []menuPanelSection{{Rows: shipCommitSubmenuRows(draft)}}, nil)
 }
 
 func shipFileMaxNumWidth(fileCount int) int {
@@ -134,12 +181,20 @@ func printShipFileBox(mode ui.ChromeMode, title string, sel *gittool.ShipFileSel
 }
 
 func runGitShip(dir, message string) (int, error) {
+	draft := newShipCommitDraft(message)
+	var shipMsg string
 	opts := &gittool.ShipOptions{
 		OnSuspicious: promptShipSuspiciousFiles,
 	}
 	if ui.StdinIsTTY() {
+		opts.CommitMessage = &shipMsg
 		opts.OnSelect = func(paths []string) ([]string, error) {
-			return promptShipFileSelect(dir, paths)
+			include, err := promptShipFileSelect(dir, paths, draft)
+			if err != nil {
+				return nil, err
+			}
+			shipMsg = draft.CommitMessage()
+			return include, nil
 		}
 	}
 	return gittool.ShipWithOptions(dir, message, opts)
