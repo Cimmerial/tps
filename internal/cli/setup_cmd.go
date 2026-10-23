@@ -22,7 +22,7 @@ var setupPath string
 var setupCmd = &cobra.Command{
 	Use:   "setup",
 	Short: "Install/update tps and link a project (run from the app repo)",
-	Long:  "Install or update tps from your linked dev repo when present, ensure Go bin is on PATH in ~/.zshrc, link the project, refresh TPS.md, and add TPS.md to .gitignore.",
+	Long:  "Install or update tps from your linked dev repo when present, ensure Go bin is on PATH in ~/.zshrc, link the project, refresh TPS.md and TPS_SPECS.md, and add them to .gitignore.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		preferID, err := runSetup(setupName, setupPath)
 		if err != nil {
@@ -59,10 +59,9 @@ func runSetup(nameOverride, pathOverride string) (string, error) {
 	if existing := cfg.FindByPath(root); existing != nil && nameOverride == "" && pathOverride == "" {
 		fmt.Println(ui.Yellow(fmt.Sprintf("%q is already set up at %s", existing.Name, existing.Path)))
 		fmt.Println(ui.Dim("add commands in config.yaml, nc, or export/import · run ih for install help"))
-		if tpsRepo := instance.DevRepoRoot(cfg); tpsRepo != "" {
-			if _, err := instance.SyncProject(tpsRepo, existing.Path); err != nil {
-				return "", err
-			}
+		tpsRepo := instance.DevRepoRoot(cfg)
+		if _, err := instance.SyncProject(tpsRepo, existing.Path); err != nil {
+			return "", err
 		}
 		return existing.ID, nil
 	}

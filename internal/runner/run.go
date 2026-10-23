@@ -63,6 +63,9 @@ func RunScriptCaptureStderr(p *config.Project, script string) (int, string, erro
 	if ui.SimplifiedOutput() {
 		sum := summarizeSuccess(script, buf.String())
 		ui.PrintOutcome(true, sum.label, sum.detail)
+		if buf.Len() > 0 {
+			_, _ = os.Stdout.Write(buf.Bytes())
+		}
 	}
 	return 0, buf.String(), nil
 }

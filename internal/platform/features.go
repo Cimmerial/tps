@@ -26,7 +26,7 @@ func CloseAllTermsHelp() (command, abbrev, description string) {
 
 // OptionsMenuDescription is the options (o) row in full help.
 func OptionsMenuDescription() string {
-	base := "logo/color, terminal colors, default IDE, preferred browser"
+	base := "logo/color, terminal colors, username, default IDE, preferred browser"
 	if SupportsCaptureSMS() {
 		return "logo/color, terminal colors, capture sms, " + base
 	}

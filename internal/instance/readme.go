@@ -15,6 +15,12 @@ const ReadmeRelSource = "internal/instance/README.md"
 // ReadmeDestName is written at the root of each linked app repo.
 const ReadmeDestName = "TPS.md"
 
+// SpecsRelSource is the canonical spec path in a tps dev clone (for editors).
+const SpecsRelSource = "internal/instance/SPECS.md"
+
+// SpecsDestName is written at the root of each linked app repo.
+const SpecsDestName = "TPS_SPECS.md"
+
 func IsDevRepo(projectRoot string) bool {
 	if projectRoot == "" {
 		return false
@@ -54,6 +60,25 @@ func readmeBytes(tpsRepo string) ([]byte, error) {
 	return nil, nil
 }
 
+func specsBytes(tpsRepo string) ([]byte, error) {
+	if tpsRepo != "" {
+		for _, rel := range []string{SpecsRelSource, "instance/SPECS.md"} {
+			src := filepath.Join(tpsRepo, rel)
+			data, err := os.ReadFile(src)
+			if err == nil {
+				return data, nil
+			}
+			if !os.IsNotExist(err) {
+				return nil, fmt.Errorf("read instance specs: %w", err)
+			}
+		}
+	}
+	if len(EmbeddedSpecs()) > 0 {
+		return EmbeddedSpecs(), nil
+	}
+	return nil, nil
+}
+
 func SyncProject(tpsRepo, projectRoot string) (bool, error) {
 	if projectRoot == "" {
 		return false, nil
@@ -61,26 +86,37 @@ func SyncProject(tpsRepo, projectRoot string) (bool, error) {
 	if IsDevRepo(projectRoot) {
 		return false, nil
 	}
-	data, err := readmeBytes(tpsRepo)
+	readme, err := readmeBytes(tpsRepo)
+	if err != nil {
+		return false, err
+	}
+	specs, err := specsBytes(tpsRepo)
 	if err != nil {
 		return false, err
 	}
 	wrote := false
-	if len(data) > 0 {
+	if len(readme) > 0 {
 		dst := filepath.Join(projectRoot, ReadmeDestName)
-		if err := os.WriteFile(dst, data, 0o644); err != nil {
+		if err := os.WriteFile(dst, readme, 0o644); err != nil {
 			return false, fmt.Errorf("write %s: %w", ReadmeDestName, err)
 		}
 		wrote = true
 	}
-	if err := ensureReadmeGitignored(projectRoot); err != nil {
+	if len(specs) > 0 {
+		dst := filepath.Join(projectRoot, SpecsDestName)
+		if err := os.WriteFile(dst, specs, 0o644); err != nil {
+			return false, fmt.Errorf("write %s: %w", SpecsDestName, err)
+		}
+		wrote = true
+	}
+	if err := ensureInstanceDocsGitignored(projectRoot); err != nil {
 		return wrote, err
 	}
 	return wrote, nil
 }
 
-func ensureReadmeGitignored(projectRoot string) error {
-	return git.AppendGitignoreLines(projectRoot, []string{ReadmeDestName})
+func ensureInstanceDocsGitignored(projectRoot string) error {
+	return git.AppendGitignoreLines(projectRoot, []string{ReadmeDestName, SpecsDestName})
 }
 
 func SyncAllLinked(tpsRepo string, cfg *config.Config) (int, error) {

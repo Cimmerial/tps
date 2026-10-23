@@ -10,12 +10,23 @@ import (
 )
 
 const exportVersion = 1
+const exportVersion2 = 2
 
 type ExportBundle struct {
-	Version  int       `yaml:"version"`
-	Project  *Project  `yaml:"project,omitempty"`
-	Projects []Project `yaml:"projects,omitempty"`
+	Version     int          `yaml:"version"`
+	Preferences *Preferences `yaml:"preferences,omitempty"`
+	Project     *Project     `yaml:"project,omitempty"`
+	Projects    []Project    `yaml:"projects,omitempty"`
 }
+
+// ExportKind selects default export filename shape.
+type ExportKind int
+
+const (
+	ExportKindProject ExportKind = iota
+	ExportKindOptions
+	ExportKindEverything
+)
 
 func ExportProject(p *Project) ([]byte, error) {
 	b := ExportBundle{Version: exportVersion, Project: p}
@@ -25,6 +36,85 @@ func ExportProject(p *Project) ([]byte, error) {
 func ExportAllProjects(projects []Project) ([]byte, error) {
 	b := ExportBundle{Version: exportVersion, Projects: projects}
 	return yaml.Marshal(b)
+}
+
+func ExportProjectCommands(p *Project) ([]byte, error) {
+	slim := slimProjectForExport(*p)
+	b := ExportBundle{Version: exportVersion2, Project: &slim}
+	return yaml.Marshal(b)
+}
+
+func ExportPreferencesBundle(prefs *Preferences, includeUsername bool) ([]byte, error) {
+	b := ExportBundle{Version: exportVersion2, Preferences: CopyPortablePreferences(prefs, includeUsername)}
+	return yaml.Marshal(b)
+}
+
+func ExportEverything(prefs *Preferences, projects []Project, includeUsername bool) ([]byte, error) {
+	slim := make([]Project, 0, len(projects))
+	for _, p := range projects {
+		slim = append(slim, slimProjectForExport(p))
+	}
+	b := ExportBundle{
+		Version:     exportVersion2,
+		Preferences: CopyPortablePreferences(prefs, includeUsername),
+		Projects:    slim,
+	}
+	return yaml.Marshal(b)
+}
+
+func slimProjectForExport(p Project) Project {
+	return Project{
+		Name:     p.Name,
+		Commands: p.Commands,
+	}
+}
+
+// CopyPortablePreferences clones user-facing prefs for export (no session project).
+func CopyPortablePreferences(p *Preferences, includeUsername bool) *Preferences {
+	if p == nil {
+		return &Preferences{}
+	}
+	cp := *p
+	cp.SessionProjectID = ""
+	if !includeUsername {
+		cp.Username = ""
+	}
+	return &cp
+}
+
+// ApplyPortablePreferences overwrites portable fields; session_project_id is unchanged.
+// When includeUsername is false, dst.Username is left unchanged.
+func ApplyPortablePreferences(dst, src *Preferences, includeUsername bool) {
+	if dst == nil || src == nil {
+		return
+	}
+	dst.Logo = src.Logo
+	dst.TitleCard = src.TitleCard
+	dst.TitleCardColor = src.TitleCardColor
+	dst.Accent = src.Accent
+	dst.ColorEnabled = src.ColorEnabled
+	dst.SMSTo = src.SMSTo
+	dst.SMSShortcut = src.SMSShortcut
+	dst.PreferredIDE = src.PreferredIDE
+	dst.PreferredBrowser = src.PreferredBrowser
+	dst.SimplifiedOutput = src.SimplifiedOutput
+	if includeUsername {
+		dst.Username = src.Username
+	}
+}
+
+// MergeCommandsByAlias updates matching aliases and appends new commands.
+func MergeCommandsByAlias(dst *Project, imported []Command) {
+	if dst == nil {
+		return
+	}
+	for _, c := range imported {
+		if existing := dst.FindCommand(c.Alias); existing != nil {
+			*existing = c
+			continue
+		}
+		dst.Commands = append(dst.Commands, c)
+	}
 }
 
 func WriteExportFile(path string, data []byte) error {
@@ -85,6 +175,49 @@ func (c *Config) upsertProject(p Project) error {
 	return nil
 }
 
+// BundleProjectEntries returns command sets from a bundle (v1 or v2).
+func (b ExportBundle) BundleProjectEntries() []Project {
+	var out []Project
+	if b.Project != nil && len(b.Project.Commands) > 0 {
+		out = append(out, *b.Project)
+	}
+	for _, p := range b.Projects {
+		if len(p.Commands) > 0 {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func (b ExportBundle) HasPreferences() bool {
+	return b.Preferences != nil && b.Version >= exportVersion2
+}
+
+func (b ExportBundle) HasProjectCommands() bool {
+	return len(b.BundleProjectEntries()) > 0
+}
+
+// CommandsForImport extracts commands from v1 full project or v2 name+commands.
+func (b ExportBundle) CommandsForImport(projectName string) ([]Command, bool) {
+	entries := b.BundleProjectEntries()
+	if len(entries) == 0 {
+		if b.Version < exportVersion2 && b.Project != nil && len(b.Project.Commands) > 0 {
+			return b.Project.Commands, true
+		}
+		return nil, false
+	}
+	if len(entries) == 1 {
+		return entries[0].Commands, true
+	}
+	projectName = strings.TrimSpace(projectName)
+	for _, p := range entries {
+		if strings.EqualFold(strings.TrimSpace(p.Name), projectName) {
+			return p.Commands, true
+		}
+	}
+	return nil, false
+}
+
 func SanitizeExportBasename(name string) string {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -104,4 +237,21 @@ func SanitizeExportBasename(name string) string {
 		return "project"
 	}
 	return out
+}
+
+// ExportDefaultFilename builds tps-…-username.tps.yaml default names.
+func ExportDefaultFilename(kind ExportKind, projectName, username string) string {
+	user := SanitizeExportBasename(username)
+	if user == "" {
+		user = "user"
+	}
+	switch kind {
+	case ExportKindOptions:
+		return fmt.Sprintf("tps-options-%s.tps.yaml", user)
+	case ExportKindEverything:
+		return fmt.Sprintf("tps-all-%s.tps.yaml", user)
+	default:
+		proj := SanitizeExportBasename(projectName)
+		return fmt.Sprintf("tps-%s-%s.tps.yaml", proj, user)
+	}
 }

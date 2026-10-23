@@ -2,6 +2,8 @@
 
 package pick
 
+import "strings"
+
 func ChooseFile(prompt string, filter FileFilter) (string, error) {
 	path, err := readPathLine(prompt)
 	if err != nil {
@@ -28,4 +30,12 @@ func ChooseFiles(prompt string, filter FileFilter) ([]string, error) {
 
 func ChooseFolder(prompt string) (string, error) {
 	return readPathLine(prompt)
+}
+
+func ChooseSaveFile(prompt string, defaultName string) (string, error) {
+	path, err := readPathLine(prompt + " (path for " + strings.TrimSpace(defaultName) + ")")
+	if err != nil {
+		return "", err
+	}
+	return ResolveSavePath(path, defaultName), nil
 }

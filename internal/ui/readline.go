@@ -32,13 +32,22 @@ func ReadEditedLineFuncHistory(promptFn func() string, history *[]string) (strin
 	if err != nil {
 		return readLineFallback(promptFn())
 	}
-	defer term.Restore(fd, old)
+	defer func() {
+		// Re-enable autowrap and bracketed paste before restoring cooked mode.
+		fmt.Print("\033[?7h\033[?2004l")
+		term.Restore(fd, old)
+	}()
+
+	// Bracketed paste: terminals wrap pasted text in ESC[200~ … ESC[201~].
+	// Disable autowrap so long lines redraw on one row (\r\033[K only clears one physical line).
+	fmt.Print("\033[?2004h\033[?7l")
 
 	fmt.Print("\r\033[K" + promptFn())
 	buf := []rune{}
 	pos := 0
 	histIdx := -1
 	var histDraft string
+	pasting := false
 	in := bufio.NewReader(os.Stdin)
 
 	redraw := func() {
@@ -48,11 +57,16 @@ func ReadEditedLineFuncHistory(promptFn func() string, history *[]string) (strin
 			fmt.Printf("\033[%dD", tail)
 		}
 	}
+	redrawMaybe := func() {
+		if !pasting {
+			redraw()
+		}
+	}
 
 	setBuf := func(s string) {
 		buf = []rune(s)
 		pos = len(buf)
-		redraw()
+		redrawMaybe()
 	}
 
 	clearHistBrowse := func() {
@@ -81,6 +95,15 @@ func ReadEditedLineFuncHistory(promptFn func() string, history *[]string) (strin
 
 		switch b {
 		case '\r', '\n':
+			if b == '\r' && in.Buffered() > 0 {
+				peek, err := in.Peek(1)
+				if err == nil && len(peek) > 0 && peek[0] == '\n' {
+					_, _ = in.ReadByte()
+				}
+			}
+			if pasting {
+				continue
+			}
 			fmt.Print("\r\033[K\n")
 			line := string(buf)
 			appendLineHistory(history, line)
@@ -99,14 +122,14 @@ func ReadEditedLineFuncHistory(promptFn func() string, history *[]string) (strin
 			if start < pos {
 				buf = append(buf[:start], buf[pos:]...)
 				pos = start
-				redraw()
+				redrawMaybe()
 			}
 		case 127, 8: // backspace / DEL
 			clearHistBrowse()
 			if pos > 0 {
 				buf = append(buf[:pos-1], buf[pos:]...)
 				pos--
-				redraw()
+				redrawMaybe()
 			}
 		case 27: // ESC
 			seq, err := readEscapeSeq(in)
@@ -114,6 +137,11 @@ func ReadEditedLineFuncHistory(promptFn func() string, history *[]string) (strin
 				return "", err
 			}
 			switch seq {
+			case "[200~":
+				pasting = true
+			case "[201~":
+				pasting = false
+				redraw()
 			case "[A", "OA":
 				if history != nil && len(*history) > 0 {
 					if histIdx == -1 {
@@ -138,57 +166,57 @@ func ReadEditedLineFuncHistory(promptFn func() string, history *[]string) (strin
 				clearHistBrowse()
 				if pos > 0 {
 					pos--
-					redraw()
+					redrawMaybe()
 				}
 			case "[C", "OC":
 				clearHistBrowse()
 				if pos < len(buf) {
 					pos++
-					redraw()
+					redrawMaybe()
 				}
 			case "[1;3D", "[1;5D":
 				clearHistBrowse()
 				pos = moveWordLeft(buf, pos)
-				redraw()
+				redrawMaybe()
 			case "[1;3C", "[1;5C":
 				clearHistBrowse()
 				pos = moveWordRight(buf, pos)
-				redraw()
+				redrawMaybe()
 			case "[3~":
 				clearHistBrowse()
 				if pos < len(buf) {
 					buf = append(buf[:pos], buf[pos+1:]...)
-					redraw()
+					redrawMaybe()
 				}
 			case "[3;3~":
 				clearHistBrowse()
 				end := moveWordRight(buf, pos)
 				if end > pos {
 					buf = append(buf[:pos], buf[end:]...)
-					redraw()
+					redrawMaybe()
 				}
 			case "[H", "[1~", "OH":
 				clearHistBrowse()
 				pos = 0
-				redraw()
+				redrawMaybe()
 			case "[F", "[4~", "OF":
 				clearHistBrowse()
 				pos = len(buf)
-				redraw()
+				redrawMaybe()
 			case "\x1bb":
 				clearHistBrowse()
 				pos = moveWordLeft(buf, pos)
-				redraw()
+				redrawMaybe()
 			case "\x1bf":
 				clearHistBrowse()
 				pos = moveWordRight(buf, pos)
-				redraw()
+				redrawMaybe()
 			case "\x1bd":
 				clearHistBrowse()
 				end := moveWordRight(buf, pos)
 				if end > pos {
 					buf = append(buf[:pos], buf[end:]...)
-					redraw()
+					redrawMaybe()
 				}
 			case "\x1b\x7f", "\x1b\b":
 				clearHistBrowse()
@@ -196,7 +224,7 @@ func ReadEditedLineFuncHistory(promptFn func() string, history *[]string) (strin
 				if start < pos {
 					buf = append(buf[:start], buf[pos:]...)
 					pos = start
-					redraw()
+					redrawMaybe()
 				}
 			}
 		default:
@@ -213,7 +241,7 @@ func ReadEditedLineFuncHistory(promptFn func() string, history *[]string) (strin
 			}
 			buf = append(buf[:pos], append([]rune{r}, buf[pos:]...)...)
 			pos++
-			redraw()
+			redrawMaybe()
 		}
 	}
 }

@@ -23,6 +23,7 @@ type prefSnapshot struct {
 	preferredIDE       string
 	preferredBrowser   string
 	simplifiedOutput   bool
+	username           string
 }
 
 func snapshotPreferences(p *config.Preferences) prefSnapshot {
@@ -36,6 +37,7 @@ func snapshotPreferences(p *config.Preferences) prefSnapshot {
 		preferredIDE:       string(ide.NormalizeID(p.PreferredIDE)),
 		preferredBrowser:   string(browser.NormalizeID(p.PreferredBrowser)),
 		simplifiedOutput:   p.SimplifiedOutput,
+		username:           strings.TrimSpace(p.Username),
 	}
 }
 
@@ -71,6 +73,9 @@ func optionsSessionChanges(before, after prefSnapshot) []string {
 	}
 	if before.simplifiedOutput != after.simplifiedOutput {
 		lines = append(lines, formatPrefChange("command output", outputModeLabel(before.simplifiedOutput), outputModeLabel(after.simplifiedOutput)))
+	}
+	if before.username != after.username {
+		lines = append(lines, formatPrefChange("username", prefDisplay(before.username), prefDisplay(after.username)))
 	}
 	return lines
 }
@@ -116,6 +121,7 @@ func optionsTopMenuRows(prefs *config.Preferences) []numberedMenuRow {
 	rows = append(rows,
 		numberedMenuRow{Num: strconv.Itoa(n), Desc: optionsPreferredIDERowDesc(prefs)},
 		numberedMenuRow{Num: strconv.Itoa(n + 1), Desc: optionsPreferredBrowserRowDesc(prefs)},
+		numberedMenuRow{Num: strconv.Itoa(n + 2), Desc: optionsUsernameRowDesc(prefs)},
 	)
 	return rows
 }
@@ -157,6 +163,13 @@ func runOptionsTopMenuChoice(choice int, prefs *config.Preferences, projectID st
 	if choice == n {
 		changed, err = optionsPreferredBrowserMenu(prefs, projectID, statusTick)
 		return true, changed, err
+	}
+	n++
+	if choice == n {
+		if err := optionsPromptUsername(prefs); err != nil {
+			return true, false, err
+		}
+		return true, true, nil
 	}
 	return false, false, nil
 }

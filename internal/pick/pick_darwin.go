@@ -59,6 +59,32 @@ func ChooseFiles(prompt string, filter FileFilter) ([]string, error) {
 	return paths, nil
 }
 
+func ChooseSaveFile(prompt string, defaultName string) (string, error) {
+	defaultName = strings.TrimSpace(defaultName)
+	if defaultName == "" {
+		defaultName = "export.tps.yaml"
+	}
+	path, err := chooseSaveFileOSA(prompt, defaultName)
+	if err == nil {
+		return path, nil
+	}
+	if err == ErrCancelled {
+		return "", err
+	}
+	printOSAFallback(err)
+	path, err = readPathLine(prompt + " (path for " + defaultName + ")")
+	if err != nil {
+		return "", err
+	}
+	return ResolveSavePath(path, defaultName), nil
+}
+
+func chooseSaveFileOSA(prompt, defaultName string) (string, error) {
+	prompt = escapeAppleScript(prompt)
+	defaultName = escapeAppleScript(defaultName)
+	return runOSA([]string{fmt.Sprintf(`POSIX path of (choose file name with prompt "%s" default name "%s")`, prompt, defaultName)})
+}
+
 func ChooseFolder(prompt string) (string, error) {
 	path, err := chooseFolderOSA(prompt)
 	if err == nil {

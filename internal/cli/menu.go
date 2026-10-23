@@ -132,15 +132,15 @@ func printFullHelp(p *config.Project) {
 			rows: []helpRow{
 				cmdRow("config", "c", "open config.yaml in Cursor/VS Code or $EDITOR"),
 				cmdRow("edit", "e", "edit commands, tags, shells (e hello)"),
-				cmdRow("new command", "nc", "nc -n name -a abbrev -c shell (-tags admin,git -t terminal, -m capture); run: ic -user"),
+				cmdRow("new command", "nc", "nc -n name -a abbrev -c shell (-mac -linux -win, -c2, -tags -t -close -H -fg -m -desc); nc -help"),
 				cmdRow("terminals", "t", platform.TerminalsHelpLine()),
-				cmdRow("export", "export", "export project YAML (export -a for all)"),
-				cmdRow("import", "import", "import path/to/file.tps.yaml"),
+				cmdRow("export", "export", "export options and/or project commands (export -a for everything)"),
+				cmdRow("import", "import", "import from file (import path/to/file.tps.yaml)"),
 				cmdRow("config examples", "ce", "YAML & nc examples for new commands"),
 				cmdRow("setup", "setup", "install tps + link this repo (setup -n name --path dir)"),
 				tipRow("tags", "tags: [admin, git] — first tag is the menu folder"),
 				tipRow("precursor", "precursor: fas — run another alias first; foreground steps share one shell"),
-				tipRow("multi shell", "shell1/shell2… or linux_shell / darwin_shell / windows_shell (parallel terminals)"),
+				tipRow("multi shell", "nc -c … -c … or -mac / -linux / -win (YAML shell2, darwin_shell, linux_shell, windows_shell)"),
 			},
 		},
 	}
@@ -150,7 +150,7 @@ func printFullHelp(p *config.Project) {
 		sections = append(sections, helpSection{
 			title: "update",
 			rows: []helpRow{
-				cmdRow("update", "u", "git pull + rebuild (dev repo) or GitHub release; sync PATH binaries + TPS.md"),
+				cmdRow("update", "u", "git pull + rebuild (dev repo) or GitHub release; sync PATH binaries + TPS.md + TPS_SPECS.md"),
 			},
 		})
 	}

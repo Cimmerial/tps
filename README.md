@@ -40,7 +40,7 @@ tps is a **stay-open CLI** for day-to-day work on your own repos. Each linked pr
 - **Non-blocking servers** — long-running commands can detach into Terminal.app (macOS) or other terminals so the hub keeps accepting input.
 - **Local and personal** — not CI, not multi-user hosting; YAML on your machine is the source of truth.
 
-Each linked app repo also gets **`TPS.md`** at its root (auto-written on `setup`, link, or update). That file is a short on-repo cheat sheet; this README is the full reference.
+Each linked app repo also gets **`TPS.md`** and **`TPS_SPECS.md`** at its root (auto-written on `setup`, link, or update; both gitignored). `TPS.md` is a short cheat sheet; `TPS_SPECS.md` is the execution contract for commands and scripts. This README is the full user reference.
 
 ---
 
@@ -74,7 +74,7 @@ When you run `tps` with no subcommand:
 
 | Command | Purpose |
 |---------|---------|
-| `tps setup` | Install/update tps on PATH, link cwd (or `setup -n name --path dir`), refresh `TPS.md` |
+| `tps setup` | Install/update tps on PATH, link cwd (or `setup -n name --path dir`), refresh `TPS.md` and `TPS_SPECS.md` |
 | `tps project add` | Link a repo (`add --path` optional) |
 | `tps project list` | List linked projects |
 
@@ -94,13 +94,17 @@ Commands live under each project in config (or add them in-session).
 | `abbreviation` / `abbrev` | What you type in tps |
 | `description` | Shown in the menu |
 | `shell` | Run via `sh -c` from project root |
-| `detach` | Open in a background terminal instead of blocking the hub |
-| `close_on_complete` | With `detach`, close the tab when the command exits (macOS) |
-| `capture` | Watch log for a URL preset (`trycloudflare` / `cf`) or regex; print + clipboard (+ optional SMS on macOS) |
+| `detach` | Open in a background terminal instead of blocking the hub (`nc -t`) |
+| `close_on_complete` | With `detach`, close the tab when the command exits (macOS; `nc -close`) |
+| `handoff` | Replace tps in the same terminal for TUIs/REPLs (`nc -H`) |
+| `foreground` | Stay in this session; skip auto-detach heuristics (`nc -fg`) |
+| `capture` | Watch log for a URL preset (`trycloudflare` / `cf`) or regex; print + clipboard (+ optional SMS on macOS; `nc -m`) |
+| `capture_actions` | With `capture`: `print`, `clipboard`, `sms` (`nc -actions`) |
 | `tags` | Menu folders — **first tag** is the group name |
 | `precursor` | Run another command’s abbrev first; foreground steps share one shell |
-| `shell1`, `shell2`, … | Multiple shells in parallel (often with `detach`) |
-| `linux_shell`, `darwin_shell`, `windows_shell` | OS-specific shell strings |
+| `shell1`, `shell2`, … | Multiple shells in parallel (often with `detach`; `nc`: repeat `-c` or `-c2`) |
+| `handler` | In-process builtin (dev-repo commands; `nc -handler`) |
+| `linux_shell`, `darwin_shell`, `windows_shell` | OS-specific shell strings (`nc -linux`, `-mac`, `-win`) |
 | `menu` | Addon tree menu (see [ADDONS.md](ADDONS.md)) |
 
 ### Shell placeholders
@@ -111,7 +115,7 @@ Use `[INPUT1]`, `[INPUT2]`, … in `shell`. At run time, pass values after the a
 
 | Keys | Action |
 |------|--------|
-| **`nc`** | New command: `nc -n name -a abbrev -c 'shell'` — add `-t` for detach, `-m trycloudflare` for capture, `-tags admin,git` |
+| **`nc`** | New command: `nc -n name -a abbrev -c 'shell'`. Also `-mac` / `-linux` / `-win`, `-c2`, `-t`, `-close`, `-H`, `-fg`, `-m`, `-actions`, `-tags`, `-desc`, `-precursor`, `-handler`, `-menu`. `nc -help` lists every flag |
 | **`e`** / **`edit`** | Change shells (`e hello` or pick from menu) |
 | **`ce`** | Print YAML / `nc` examples |
 
@@ -130,7 +134,7 @@ Run **`h`** for the full built-in list; **`ce`** mirrors many config patterns.
 | quit | q | Exit tps |
 | project | p · p1 | Switch linked project |
 | pb | | Switch back to previous project |
-| options | o | Logo/color, terminal colors, SMS capture, default IDE, preferred browser |
+| options | o | Logo/color, terminal colors, username, SMS capture, default IDE, preferred browser |
 | open in desired ide | ide | Open project in Cursor/VS Code (or default IDE) |
 | close all terms | vite | macOS: kill tab processes and close every Terminal.app window |
 
@@ -140,10 +144,10 @@ Run **`h`** for the full built-in list; **`ce`** mirrors many config patterns.
 |---------|--------|-------------|
 | config | c | Open `config.yaml` in IDE or `$EDITOR` |
 | edit | e | Edit commands, tags, shells |
-| new command | nc | Add a command from flags |
+| new command | nc | Add a command from flags (`nc -help`; same fields as YAML) |
 | terminals | t | List jobs · `tk` kill · `tk -a` all projects · `t -k N` one job · `tr` restart history |
-| export | export | Export project YAML (`export -a` for all) |
-| import | import | Merge from `path/to/file.tps.yaml` |
+| export | export | Export options and/or commands (`export -a` for everything) |
+| import | import | Import options or merge commands (`import path/to/file.tps.yaml`) |
 | config examples | ce | YAML and `nc` examples |
 | setup | setup | Install tps + link repo (`setup -n name --path dir`) |
 
@@ -168,7 +172,7 @@ Run **`h`** for the full built-in list; **`ce`** mirrors many config patterns.
 
 | Command | Abbrev | Description |
 |---------|--------|-------------|
-| update | u | `git pull` + rebuild, sync every `tps` on PATH, refresh `TPS.md` |
+| update | u | `git pull` + rebuild, sync every `tps` on PATH, refresh `TPS.md` and `TPS_SPECS.md` |
 
 Without a dev clone, **`u`** installs the latest [GitHub release](https://github.com/Cimmerial/tps/releases). Opening `tps` may also quietly rebuild when the linked dev repo changed.
 
@@ -217,7 +221,7 @@ Separate git repos (for example [tps-utilities](https://github.com/Cimmerial/tps
 - **SMS capture notify** — macOS only.
 - **`vite` / close all Terminal windows** — Terminal.app on macOS only.
 - **Detached tab auto-close** — macOS only; other OSes may leave terminal windows open after `tk`.
-- **`TPS.md` in app repos** is overwritten on update — keep custom notes elsewhere.
+- **`TPS.md` and `TPS_SPECS.md` in app repos** are overwritten on update — keep custom notes elsewhere.
 
 ---
 

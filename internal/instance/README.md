@@ -8,12 +8,14 @@ TPS is a **personal project command hub**: one interactive CLI where this repo�
 
 Config lives in your OS user config dir (e.g. macOS `~/Library/Application Support/tps/config.yaml`, Linux `~/.config/tps`, Windows `%AppData%\tps`). Link this repo once with `tps setup` or `tps project add`.
 
+**Script / command authors:** see **`TPS_SPECS.md`** in this repo (same sync as this file) for how shells run from the project root, handoff, detach, and YAML fields.
+
 ## Day to day
 
 | In `tps` | Meaning |
 |----------|---------|
 | Type an **abbrev** or alias | Run that project command |
-| **`nc`** | New command (`nc -n name -a abbrev -c 'shell'`) |
+| **`nc`** | New command — same fields as YAML (`-c`, `-mac` / `-linux` / `-win`, `-t`, `-close`, `-H`, `-m`, …); **`nc -help`** |
 | **`e` / `edit`** | Change a command’s shell |
 | **`t`** | List detached terminal jobs |
 | **`t -k` / `tk`** | Kill detached jobs for this project |
@@ -21,7 +23,7 @@ Config lives in your OS user config dir (e.g. macOS `~/Library/Application Suppo
 | **`vite`** | (macOS) Kill processes and close every Terminal.app window |
 | **`tr` / `t -r`** | Kill all and replay launch history |
 | **`p`** | Switch linked project |
-| **`export` / `import`** | Backup or merge project YAML |
+| **`export` / `import`** | Backup options and commands, or merge commands into a project |
 | **`ih`** | Install / link / update help for this machine |
 | **`iu`** | Install **tps-utilities** addon (`h` → TPS ADDONS) |
 | **`u`** | Update tps (git pull + build if dev repo linked, else GitHub release) |
@@ -50,6 +52,6 @@ Opening `tps` quietly rebuilds when a linked dev clone changed; **`u`** also syn
 - **Detached tab auto-close** — macOS only; Linux/Windows kill jobs via `tk` but may leave the terminal window open.
 - **Single user, local machine** — not a shared service or CI runner.
 - **Project must be linked** in config; cwd must match git root (or heal via `git remote`).
-- **This file** is overwritten on tps update; custom notes belong in your own docs, not `TPS.md`.
+- **This file** and **`TPS_SPECS.md`** are overwritten on tps update; custom notes belong in your own docs, not here.
 
 For full design notes and roadmap, see `DESIGN_DOC.md` in the tps dev repo.

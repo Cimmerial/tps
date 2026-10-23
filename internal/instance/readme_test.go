@@ -52,8 +52,39 @@ func TestSyncProjectCopiesReadme(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(ignore) != "TPS.md\n" {
+	wantIgnore := "TPS.md\nTPS_SPECS.md\n"
+	if string(ignore) != wantIgnore {
 		t.Fatalf(".gitignore %q", ignore)
+	}
+	if _, err := os.Stat(filepath.Join(app, SpecsDestName)); err != nil {
+		t.Fatalf("expected %s from embed: %v", SpecsDestName, err)
+	}
+}
+
+func TestSyncProjectCopiesSpecsFromDisk(t *testing.T) {
+	tpsRepo := t.TempDir()
+	srcDir := filepath.Join(tpsRepo, "instance")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	specBody := "# specs from disk\n"
+	if err := os.WriteFile(filepath.Join(srcDir, "SPECS.md"), []byte(specBody), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	app := t.TempDir()
+	wrote, err := SyncProject(tpsRepo, app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !wrote {
+		t.Fatal("expected write")
+	}
+	got, err := os.ReadFile(filepath.Join(app, SpecsDestName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != specBody {
+		t.Fatalf("got %q", got)
 	}
 }
 
@@ -69,7 +100,7 @@ func TestSyncProjectGitignoreWhenAlreadyPresent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(ignore) != "node_modules/\nTPS.md\n" {
+	if string(ignore) != "node_modules/\nTPS.md\nTPS_SPECS.md\n" {
 		t.Fatalf(".gitignore %q", ignore)
 	}
 }

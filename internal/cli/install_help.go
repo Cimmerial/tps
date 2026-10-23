@@ -47,12 +47,12 @@ func printInstallHelp() {
 	fmt.Println(ui.Bold("Link an app repo"))
 	fmt.Printf("    %s\n", ui.Cyan("cd your-app && tps setup"))
 	fmt.Printf("    %s\n", ui.Cyan("tps project add"))
-	fmt.Println(ui.Dim("  writes TPS.md in the repo (how tps works here + limits)"))
+	fmt.Println(ui.Dim("  writes TPS.md + TPS_SPECS.md in the repo (cheat sheet + command/script spec)"))
 
 	fmt.Println()
 	fmt.Println(ui.Bold("Update"))
 	fmt.Printf("    %s\n", ui.Cyan("u"))
-	fmt.Println(ui.Dim("  dev clone linked: git pull, rebuild, sync every tps on PATH, refresh TPS.md"))
+	fmt.Println(ui.Dim("  dev clone linked: git pull, rebuild, sync every tps on PATH, refresh TPS.md + TPS_SPECS.md"))
 	fmt.Println(ui.Dim("  otherwise: latest GitHub release + same binary sync"))
 	fmt.Println(ui.Dim("  opening tps also quietly rebuilds when the dev repo changed (restart if needed)"))
 

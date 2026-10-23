@@ -28,16 +28,16 @@ TPS is a **personal project command hub**: one interactive CLI where linked repo
 | Mechanism | Purpose |
 |-----------|---------|
 | `tps project add` / `add --path` | Link a repo (name defaults to folder). |
-| `tps setup` / `tps setup -n name` | Install/update `tps`, PATH hint, link cwd (or path), refresh `TPS.md`. |
+| `tps setup` / `tps setup -n name` | Install/update `tps`, PATH hint, link cwd (or path), refresh `TPS.md` and `TPS_SPECS.md`. |
 | Git remote + path in YAML | **Heal** when folder moves (`ResolveFromCwd`). |
 
 ### Project commands
 
-Defined in config per project: `alias`, `shell`, `abbreviation`, optional `description`, `detach`, `close_on_complete` (with `detach: true`, close the terminal tab when the command exits), `capture`.
+Defined in config per project: `alias`, `shell` / `shell1`… / OS-specific shells, `abbreviation`, optional `description`, `tags`, `precursor`, `detach`, `close_on_complete`, `handoff`, `foreground`, `capture` + `capture_actions`, `handler`, `menu`. In-session **`nc`** sets the same fields (`nc -help`).
 
 | Interactive | Meaning |
 |-------------|---------|
-| **`nc -n name -a abbrev -c '…'`** | Add command; **`-t`** detached terminal; **`-m trycloudflare`** (or regex) capture URL from log. |
+| **`nc -n name -a abbrev -c '…'`** | Add command. **`-mac` / `-linux` / `-win`** (and `-c2`, `-mac2`, …) set per-OS and extra shells. **`-t`** detach, **`-close`** close the tab when it exits, **`-H`** handoff, **`-fg`** stay in this session, **`-m`** capture, **`-actions`**, **`-tags`**, **`-desc`**, **`-precursor`**, **`-handler`**, **`-menu`**. **`nc -help`** lists them. |
 | **`e` / `edit`** | Change shell for an alias. |
 | **`r`**, etc. | Run alias; dev-like shells auto-**detach** on macOS. |
 
@@ -55,11 +55,11 @@ Defined in config per project: `alias`, `shell`, `abbreviation`, optional `descr
 | `h` | Help |
 | `c` | Open config in Cursor/VS Code/`$EDITOR` (GUI editors non-blocking) |
 | `p` | Switch project |
-| `u` | Pull dev repo (if linked), rebuild, sync all `tps` on PATH, refresh `TPS.md`, restart |
+| `u` | Pull dev repo (if linked), rebuild, sync all `tps` on PATH, refresh `TPS.md` and `TPS_SPECS.md`, restart |
 | `g ship` / `git ship` | git add/commit/push (`gs` legacy) |
 | `g …` / `git …` | Git passthrough |
-| `export` / `export -a` | Export current project or all to YAML |
-| `import <file>` | Merge project(s) from export file |
+| `export` / `export -a` | Menu: options, per-project commands, or everything; save dialog (`export -a` skips menu) |
+| `import` / `import <file>` | Pick destination (options or project), merge commands by alias |
 | `ih` | Install / link / update help |
 | `tps` | Clear visible screen and redraw menu at top (keeps scrollback) |
 | `clear` | Clear terminal scrollback + refresh (VS Code Cmd+K style) |
@@ -91,13 +91,20 @@ internal/ui      → logo, colors, spinner, clipboard, prompt
 
 ---
 
-## Instance README (`TPS.md`)
+## Instance docs (`TPS.md`, `TPS_SPECS.md`)
 
-Each **linked app repo** gets `TPS.md` at its root: how tps works here, limitations, and common keys. The canonical source is **`internal/instance/README.md`** (not the ASCII-art `README.md`).
+Each **linked app repo** gets:
 
-**When you change behavior, menus, detach/capture, or documented limits:** edit `internal/instance/README.md`, then ship tps. Copies refresh when users run `tps setup`, link a project (`tps project add`), or update tps (`u` / auto-update after a rebuilt binary).
+- **`TPS.md`** — cheat sheet (limits, common keys). Canonical source: **`internal/instance/README.md`**.
+- **`TPS_SPECS.md`** — execution spec for commands, scripts, handoff/detach, YAML fields. Canonical source: **`internal/instance/SPECS.md`**.
 
-Implementation: `internal/instance` embeds that doc into release binaries and writes `<project>/TPS.md`.
+Both are embedded in release binaries and written to `<project>/` on sync; both are gitignored.
+
+**When you change behavior, menus, detach/capture, or documented limits:** edit `internal/instance/README.md`, then ship tps.
+
+**When you change how commands/scripts should be written for tps:** edit `internal/instance/SPECS.md`, then ship tps.
+
+Copies refresh when users run `tps setup`, link a project (`tps project add`), or update tps (`u` / auto-update after a rebuilt binary).
 
 ---
 

@@ -22,4 +22,11 @@ func TestSyncProjectUsesEmbeddedWhenNoRepo(t *testing.T) {
 	if len(got) == 0 {
 		t.Fatal("empty TPS.md")
 	}
+	specs, err := os.ReadFile(filepath.Join(app, SpecsDestName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(specs) == 0 {
+		t.Fatal("empty TPS_SPECS.md")
+	}
 }

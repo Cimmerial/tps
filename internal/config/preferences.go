@@ -22,6 +22,7 @@ type Preferences struct {
 	PreferredIDE       string `yaml:"preferred_ide,omitempty"`         // cursor, vscode, auto, …
 	PreferredBrowser   string `yaml:"preferred_browser,omitempty"`     // default, chrome, firefox, …
 	SimplifiedOutput   bool   `yaml:"simplified_output,omitempty"`     // summarize git/tests/scripts (default verbose)
+	Username           string `yaml:"username,omitempty"`              // used in export filenames and bundles
 }
 
 func PreferencesPath() (string, error) {

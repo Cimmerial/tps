@@ -278,17 +278,28 @@ func runInteractive(preferProjectID string) error {
 			}
 		case ActionExport:
 			recordMetaUse(cfg, selected, input.Action)
-			if err := runExport(cfg, selected, input); err != nil {
+			backed, err := runExport(cfg, selected, input)
+			if err != nil {
 				fmt.Fprintf(os.Stderr, "export: %v\n", err)
+			} else if backed {
+				if err := refreshInteractiveSession(projectID, statusTick, "", false); err != nil {
+					return err
+				}
 			}
 		case ActionImport:
 			recordMetaUse(cfg, selected, input.Action)
-			if err := runImport(cfg, input.Text); err != nil {
-				fmt.Fprintf(os.Stderr, "import: %v\n", err)
-			}
-			cfg, selected, err = loadProject(projectID)
+			backed, err := runImport(cfg, input.Text, selected)
 			if err != nil {
-				return err
+				fmt.Fprintf(os.Stderr, "import: %v\n", err)
+			} else if backed {
+				if err := refreshInteractiveSession(projectID, statusTick, "", false); err != nil {
+					return err
+				}
+			} else {
+				cfg, selected, err = loadProject(projectID)
+				if err != nil {
+					return err
+				}
 			}
 		case ActionSetup:
 			recordMetaUse(cfg, selected, input.Action)
