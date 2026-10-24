@@ -82,20 +82,52 @@ function Install-Release {
     return $tag
 }
 
+function Remove-LegacyProfilePath {
+    $profile = $PROFILE
+    if (-not (Test-Path -LiteralPath $profile)) {
+        return
+    }
+    $lines = @(Get-Content -LiteralPath $profile -ErrorAction SilentlyContinue)
+    $filtered = @($lines | Where-Object {
+        $_ -notlike "*$InstallDir*" -and $_ -notmatch 'Programs\\tps'
+    })
+    if ($filtered.Count -eq $lines.Count) {
+        return
+    }
+    $substantive = @($filtered | Where-Object { $_.Trim() -ne '' -and $_.Trim() -notmatch '^\s*#' })
+    if ($substantive.Count -eq 0) {
+        Remove-Item -LiteralPath $profile -Force
+        Write-Host "removed legacy PowerShell profile hook (user PATH is enough)"
+    } else {
+        Set-Content -LiteralPath $profile -Value $filtered
+        Write-Host "removed legacy PowerShell profile hook (user PATH is enough)"
+    }
+}
+
+function Refresh-SessionPath {
+    $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $env:Path = if ([string]::IsNullOrEmpty($machinePath)) { $userPath } else { "$machinePath;$userPath" }
+}
+
+function Show-ParentSessionPathHint {
+    Write-Host ""
+    Write-Host "install ran in a subprocess; refresh PATH in this window, then run tps version:"
+    Write-Host '$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")' -ForegroundColor Cyan
+}
+
 function Ensure-Path {
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
     if ($userPath -notlike "*$InstallDir*") {
-        [Environment]::SetEnvironmentVariable("Path", "$userPath;$InstallDir", "User")
-        Write-Host "added $InstallDir to user PATH (open a new terminal)"
+        if ([string]::IsNullOrEmpty($userPath)) {
+            [Environment]::SetEnvironmentVariable("Path", $InstallDir, "User")
+        } else {
+            [Environment]::SetEnvironmentVariable("Path", "$userPath;$InstallDir", "User")
+        }
+        Write-Host "added $InstallDir to user PATH"
     }
-    $profile = $PROFILE
-    if (-not (Test-Path $profile)) {
-        New-Item -ItemType File -Path $profile -Force | Out-Null
-    }
-    $line = '$env:Path += ";' + $InstallDir + '"'
-    if (-not (Select-String -Path $profile -Pattern $InstallDir -SimpleMatch -Quiet -ErrorAction SilentlyContinue)) {
-        Add-Content -Path $profile -Value $line
-    }
+    Remove-LegacyProfilePath
+    Refresh-SessionPath
 }
 
 $resolvedTag = $null
@@ -118,4 +150,8 @@ try {
 }
 
 Ensure-Path
-Write-Host "run: tps version"
+if ($env:TPS_INSTALL_SUBPROCESS -eq '1') {
+    Show-ParentSessionPathHint
+} else {
+    Write-Host "run: tps version"
+}

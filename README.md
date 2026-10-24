@@ -27,6 +27,26 @@ cd your-app-repo; tps setup; tps
 
 Developers: `go install github.com/Cimmerial/tps/cmd/tps@latest`
 
+### Uninstall
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Cimmerial/tps/main/scripts/uninstall.sh | bash
+```
+
+```powershell
+irm https://raw.githubusercontent.com/Cimmerial/tps/main/scripts/uninstall.ps1 | iex
+```
+
+From a clone, Windows may block `& .\scripts\*.ps1` (execution policy). For the **same** PowerShell window (like `irm … | iex`):
+
+```powershell
+iex (Get-Content -Raw "$PWD\scripts\uninstall.ps1")
+iex (Get-Content -Raw "$PWD\scripts\install.ps1")
+tps version
+```
+
+`.\scripts\install.cmd` runs in a subprocess; new terminals pick up PATH, or paste the cyan refresh line it prints.
+
 Config path: OS user config dir + `/tps/config.yaml` (macOS `~/Library/Application Support/tps/config.yaml`, Linux `~/.config/tps/config.yaml`, Windows `%AppData%\tps\config.yaml`). Run `tps ih` in a session for install, link, and update steps on this machine.
 
 ---
