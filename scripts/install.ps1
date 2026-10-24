@@ -85,8 +85,12 @@ function Install-Release {
 function Ensure-Path {
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
     if ($userPath -notlike "*$InstallDir*") {
-        [Environment]::SetEnvironmentVariable("Path", "$userPath;$InstallDir", "User")
-        Write-Host "added $InstallDir to user PATH (open a new terminal)"
+        if ([string]::IsNullOrEmpty($userPath)) {
+            [Environment]::SetEnvironmentVariable("Path", $InstallDir, "User")
+        } else {
+            [Environment]::SetEnvironmentVariable("Path", "$userPath;$InstallDir", "User")
+        }
+        Write-Host "added $InstallDir to user PATH"
     }
     $profile = $PROFILE
     if (-not (Test-Path $profile)) {
@@ -96,6 +100,9 @@ function Ensure-Path {
     if (-not (Select-String -Path $profile -Pattern $InstallDir -SimpleMatch -Quiet -ErrorAction SilentlyContinue)) {
         Add-Content -Path $profile -Value $line
     }
+    $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $env:Path = if ([string]::IsNullOrEmpty($machinePath)) { $userPath } else { "$machinePath;$userPath" }
 }
 
 $resolvedTag = $null

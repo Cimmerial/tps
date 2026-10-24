@@ -75,6 +75,13 @@ ensure_path_line() {
   done
 }
 
+ensure_path_now() {
+  case ":$PATH:" in
+    *":$INSTALL_DIR:"*) ;;
+    *) export PATH="$PATH:$INSTALL_DIR" ;;
+  esac
+}
+
 if install_release "$VERSION"; then
   echo "installed to $INSTALL_DIR/tps"
 else
@@ -83,4 +90,5 @@ else
 fi
 
 ensure_path_line
-echo "reload your shell, then: which tps && tps version"
+ensure_path_now
+echo "run: which tps && tps version"

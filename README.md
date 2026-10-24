@@ -27,6 +27,16 @@ cd your-app-repo; tps setup; tps
 
 Developers: `go install github.com/Cimmerial/tps/cmd/tps@latest`
 
+**Uninstall** (fresh install testing):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Cimmerial/tps/main/scripts/uninstall.sh | bash
+```
+
+```powershell
+irm https://raw.githubusercontent.com/Cimmerial/tps/main/scripts/uninstall.ps1 | iex
+```
+
 Config path: OS user config dir + `/tps/config.yaml` (macOS `~/Library/Application Support/tps/config.yaml`, Linux `~/.config/tps/config.yaml`, Windows `%AppData%\tps\config.yaml`). Run `tps ih` in a session for install, link, and update steps on this machine.
 
 ---
