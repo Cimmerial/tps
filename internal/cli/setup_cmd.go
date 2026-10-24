@@ -68,16 +68,20 @@ func runSetup(nameOverride, pathOverride string) (string, error) {
 
 	tpsRepo := devRepoRoot(cfg, nil)
 	if tpsRepo != "" {
-		spin := ui.NewSpinner("installing tps")
-		result, err := update.InstallFromProjectRoot(tpsRepo)
-		spin.Stop()
-		if err != nil {
-			return "", err
-		}
-		if result.Updated {
-			fmt.Println(ui.Green("tps updated"))
+		if _, err := exec.LookPath("go"); err != nil {
+			fmt.Println(ui.Dim("skip install: go not on PATH (using release tps binary)"))
 		} else {
-			fmt.Println(ui.Dim("tps already up to date"))
+			spin := ui.NewSpinner("installing tps")
+			result, err := update.InstallFromProjectRoot(tpsRepo)
+			spin.Stop()
+			if err != nil {
+				return "", err
+			}
+			if result.Updated {
+				fmt.Println(ui.Green("tps updated"))
+			} else {
+				fmt.Println(ui.Dim("tps already up to date"))
+			}
 		}
 	} else {
 		fmt.Println(ui.Dim("skip install: link the tps dev repo in config first (tps project add from the tps repo)"))

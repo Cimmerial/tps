@@ -110,6 +110,25 @@ function Refresh-SessionPath {
     $env:Path = if ([string]::IsNullOrEmpty($machinePath)) { $userPath } else { "$machinePath;$userPath" }
 }
 
+function Broadcast-EnvironmentChange {
+    try {
+        if (-not ([System.Management.Automation.PSTypeName]'TpsNativeMethods').Type) {
+            Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class TpsNativeMethods {
+    [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    public static extern IntPtr SendMessageTimeout(IntPtr hWnd, int Msg, UIntPtr wParam, string lParam, int fuFlags, int uTimeout, out IntPtr lpdwResult);
+}
+'@ -ErrorAction Stop
+        }
+        $unused = [IntPtr]::Zero
+        [TpsNativeMethods]::SendMessageTimeout([IntPtr]0xffff, 0x1a, [UIntPtr]::Zero, "Environment", 2, 5000, [ref]$unused) | Out-Null
+    } catch {
+        # non-fatal
+    }
+}
+
 function Show-ParentSessionPathHint {
     Write-Host ""
     Write-Host "install ran in a subprocess; refresh PATH in this window, then run tps version:"
@@ -125,6 +144,7 @@ function Ensure-Path {
             [Environment]::SetEnvironmentVariable("Path", "$userPath;$InstallDir", "User")
         }
         Write-Host "added $InstallDir to user PATH"
+        Broadcast-EnvironmentChange
     }
     Remove-LegacyProfilePath
     Refresh-SessionPath
@@ -154,4 +174,5 @@ if ($env:TPS_INSTALL_SUBPROCESS -eq '1') {
     Show-ParentSessionPathHint
 } else {
     Write-Host "run: tps version"
+    Write-Host "terminals opened before install (e.g. inside Cursor) may need that app restarted"
 }
