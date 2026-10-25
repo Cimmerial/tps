@@ -101,37 +101,50 @@ func fileFingerprint(path string) (string, error) {
 }
 
 func InstallAndRestart(root string) error {
-	var result InstallResult
-	var err error
 	if root == "" {
-		result, err = InstallFromGitHubRelease()
-		if err != nil {
-			return err
-		}
-		source, err := exec.LookPath("tps")
-		if err != nil {
-			source, _ = os.Executable()
-		}
-		synced, err := syncAllInstances("", source)
-		if err != nil {
-			return err
-		}
-		if len(synced) > 0 {
-			fmt.Println(ui.Dim(fmt.Sprintf("synced %d other install(s)", len(synced))))
-		}
-		updated := result.Updated || len(synced) > 0
-		syncInstanceReadmes("")
-		return finishInstallAndRestart(updated, result.Version)
+		return finishInstallFromRelease("", "")
 	}
 
 	if err := PullFastForward(root); err != nil {
 		return err
 	}
-	result, err = InstallFromProjectRoot(root)
+	if _, err := exec.LookPath("go"); err != nil {
+		fmt.Println(ui.Dim("update: go not on PATH; installing tps from GitHub release"))
+		return finishInstallFromRelease(root, "")
+	}
+
+	result, err := InstallFromProjectRoot(root)
 	if err != nil {
 		return err
 	}
+	return finishDevInstall(root, result)
+}
 
+func finishInstallFromRelease(readmeRoot, syncRoot string) error {
+	result, err := InstallFromGitHubRelease()
+	if err != nil {
+		return err
+	}
+	if syncRoot == "" {
+		syncRoot = readmeRoot
+	}
+	source, err := exec.LookPath("tps")
+	if err != nil {
+		source, _ = os.Executable()
+	}
+	synced, err := syncAllInstances(syncRoot, source)
+	if err != nil {
+		return err
+	}
+	if len(synced) > 0 {
+		fmt.Println(ui.Dim(fmt.Sprintf("synced %d other install(s)", len(synced))))
+	}
+	updated := result.Updated || len(synced) > 0
+	syncInstanceReadmes(readmeRoot)
+	return finishInstallAndRestart(updated, result.Version)
+}
+
+func finishDevInstall(root string, result InstallResult) error {
 	source, err := exec.LookPath("tps")
 	if err != nil {
 		exe, err := os.Executable()
@@ -140,7 +153,6 @@ func InstallAndRestart(root string) error {
 		}
 		source = exe
 	}
-
 	synced, err := syncAllInstances(root, source)
 	if err != nil {
 		return err
@@ -148,7 +160,6 @@ func InstallAndRestart(root string) error {
 	if len(synced) > 0 {
 		fmt.Println(ui.Dim(fmt.Sprintf("synced %d other install(s)", len(synced))))
 	}
-
 	updated := result.Updated || len(synced) > 0
 	syncInstanceReadmes(root)
 	ver := result.Version

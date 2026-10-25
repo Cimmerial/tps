@@ -47,6 +47,8 @@ tps version
 
 `.\scripts\install.cmd` runs in a subprocess; new terminals pick up PATH, or paste the cyan refresh line it prints.
 
+Install scripts may prompt to install **Git** and **Go** if missing (for `tps u`, `git ship`, and dev-repo builds). Skip with `TPS_SKIP_TOOLCHAIN_PROMPT=1`, or `TPS_SKIP_GIT_PROMPT=1` / `TPS_SKIP_GO_PROMPT=1`.
+
 Config path: OS user config dir + `/tps/config.yaml` (macOS `~/Library/Application Support/tps/config.yaml`, Linux `~/.config/tps/config.yaml`, Windows `%AppData%\tps\config.yaml`). Run `tps ih` in a session for install, link, and update steps on this machine.
 
 ---

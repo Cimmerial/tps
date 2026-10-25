@@ -135,6 +135,194 @@ function Show-ParentSessionPathHint {
     Write-Host '$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")' -ForegroundColor Cyan
 }
 
+function Find-GitExe {
+    $cmd = Get-Command git -ErrorAction SilentlyContinue
+    if ($cmd) {
+        return $cmd.Source
+    }
+    $candidates = @(
+        (Join-Path ${env:ProgramFiles} "Git\cmd\git.exe"),
+        (Join-Path ${env:ProgramFiles(x86)} "Git\cmd\git.exe")
+    )
+    foreach ($p in $candidates) {
+        if ($p -and (Test-Path -LiteralPath $p)) {
+            return $p
+        }
+    }
+    $desktop = Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA "GitHubDesktop\app-*\resources\app\git\cmd\git.exe") -ErrorAction SilentlyContinue |
+        Sort-Object FullName -Descending |
+        Select-Object -First 1
+    if ($desktop) {
+        return $desktop.FullName
+    }
+    return $null
+}
+
+function Ensure-GitOnUserPath {
+    $gitExe = Find-GitExe
+    if (-not $gitExe) {
+        return
+    }
+    $gitDir = Split-Path -Parent $gitExe
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    if ($userPath -like "*$gitDir*") {
+        return
+    }
+    if ([string]::IsNullOrEmpty($userPath)) {
+        [Environment]::SetEnvironmentVariable("Path", $gitDir, "User")
+    } else {
+        [Environment]::SetEnvironmentVariable("Path", "$userPath;$gitDir", "User")
+    }
+    Write-Host "added $gitDir to user PATH (git)"
+    Broadcast-EnvironmentChange
+    Refresh-SessionPath
+}
+
+function Test-InstallInteractive {
+    try {
+        return [Environment]::UserInteractive
+    } catch {
+        return $false
+    }
+}
+
+function Test-SkipGitPrompt {
+    return $env:TPS_SKIP_GIT_PROMPT -eq '1' -or $env:TPS_SKIP_TOOLCHAIN_PROMPT -eq '1'
+}
+
+function Test-SkipGoPrompt {
+    return $env:TPS_SKIP_GO_PROMPT -eq '1' -or $env:TPS_SKIP_TOOLCHAIN_PROMPT -eq '1'
+}
+
+function Add-DirToUserPath {
+    param([string]$Dir, [string]$Label)
+    if ([string]::IsNullOrWhiteSpace($Dir)) {
+        return
+    }
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    if ($userPath -like "*$Dir*") {
+        return
+    }
+    if ([string]::IsNullOrEmpty($userPath)) {
+        [Environment]::SetEnvironmentVariable("Path", $Dir, "User")
+    } else {
+        [Environment]::SetEnvironmentVariable("Path", "$userPath;$Dir", "User")
+    }
+    Write-Host "added $Dir to user PATH ($Label)"
+    Broadcast-EnvironmentChange
+    Refresh-SessionPath
+}
+
+function Offer-InstallGit {
+    if (Find-GitExe) {
+        Ensure-GitOnUserPath
+        return
+    }
+    if (Test-SkipGitPrompt) {
+        return
+    }
+    if (-not (Test-InstallInteractive)) {
+        Write-Host "git not found; install Git for tps updates (https://git-scm.com/download/win)" -ForegroundColor Yellow
+        return
+    }
+    $answer = Read-Host "Git is not installed (needed for tps update and git ship). Install Git now? [Y/n]"
+    if ($answer -match '^[Nn]') {
+        return
+    }
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        Write-Host "installing Git.Git via winget..."
+        $winget = Start-Process -FilePath winget -ArgumentList @(
+            'install', '--id', 'Git.Git', '-e', '--source', 'winget',
+            '--accept-package-agreements', '--accept-source-agreements'
+        ) -Wait -PassThru -NoNewWindow
+        if ($winget.ExitCode -ne 0) {
+            Write-Host "winget install failed (exit $($winget.ExitCode)); install manually: https://git-scm.com/download/win" -ForegroundColor Yellow
+            return
+        }
+    } else {
+        Write-Host "winget not found; open https://git-scm.com/download/win to install Git" -ForegroundColor Yellow
+        Start-Process "https://git-scm.com/download/win"
+        return
+    }
+    if (Find-GitExe) {
+        Ensure-GitOnUserPath
+        Write-Host "git installed"
+    } else {
+        Write-Host "git installed; open a new terminal if git is not found yet" -ForegroundColor Yellow
+    }
+}
+
+function Find-GoExe {
+    $cmd = Get-Command go -ErrorAction SilentlyContinue
+    if ($cmd) {
+        return $cmd.Source
+    }
+    $candidate = Join-Path ${env:ProgramFiles} "Go\bin\go.exe"
+    if (Test-Path -LiteralPath $candidate) {
+        return $candidate
+    }
+    return $null
+}
+
+function Ensure-GoOnUserPath {
+    $goExe = Find-GoExe
+    if (-not $goExe) {
+        return
+    }
+    $goDir = Split-Path -Parent $goExe
+    Add-DirToUserPath $goDir "go"
+    $goBin = Join-Path $env:USERPROFILE "go\bin"
+    try {
+        $gopath = & $goExe env GOPATH 2>$null
+        if ($gopath) {
+            $goBin = Join-Path $gopath.Trim() "bin"
+        }
+    } catch {
+        # use default goBin
+    }
+    Add-DirToUserPath $goBin "go install bin"
+}
+
+function Offer-InstallGo {
+    if (Find-GoExe) {
+        Ensure-GoOnUserPath
+        return
+    }
+    if (Test-SkipGoPrompt) {
+        return
+    }
+    if (-not (Test-InstallInteractive)) {
+        Write-Host "go not found; install Go for tps dev updates (https://go.dev/dl/)" -ForegroundColor Yellow
+        return
+    }
+    $answer = Read-Host "Go is not installed (needed for tps u / go install from the dev repo). Install Go now? [Y/n]"
+    if ($answer -match '^[Nn]') {
+        return
+    }
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        Write-Host "installing Go via winget..."
+        $winget = Start-Process -FilePath winget -ArgumentList @(
+            'install', '--id', 'GoLang.Go', '-e', '--source', 'winget',
+            '--accept-package-agreements', '--accept-source-agreements'
+        ) -Wait -PassThru -NoNewWindow
+        if ($winget.ExitCode -ne 0) {
+            Write-Host "winget install failed (exit $($winget.ExitCode)); install manually: https://go.dev/dl/" -ForegroundColor Yellow
+            return
+        }
+    } else {
+        Write-Host "winget not found; open https://go.dev/dl/ to install Go" -ForegroundColor Yellow
+        Start-Process "https://go.dev/dl/"
+        return
+    }
+    Refresh-SessionPath
+    if (Find-GoExe) {
+        Ensure-GoOnUserPath
+        Write-Host "go installed"
+    } else {
+        Write-Host "go installed; open a new terminal if go is not found yet" -ForegroundColor Yellow
+    }
+}
+
 function Ensure-Path {
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
     if ($userPath -notlike "*$InstallDir*") {
@@ -170,6 +358,8 @@ try {
 }
 
 Ensure-Path
+Offer-InstallGit
+Offer-InstallGo
 if ($env:TPS_INSTALL_SUBPROCESS -eq '1') {
     Show-ParentSessionPathHint
 } else {

@@ -16,7 +16,10 @@ func gitBaseName(path string) string {
 
 func TestGitPullCommand(t *testing.T) {
 	root := filepath.Join("/tmp", "tps")
-	cmd := gitPullCommand(root)
+	cmd, err := gitPullCommand(root)
+	if err != nil {
+		t.Fatalf("gitPullCommand: %v", err)
+	}
 	if gitBaseName(cmd.Path) != "git" {
 		t.Fatalf("path: got %q want git binary", cmd.Path)
 	}

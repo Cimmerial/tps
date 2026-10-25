@@ -14,10 +14,11 @@ func Run(dir string, args []string) (int, error) {
 	if len(args) == 0 {
 		return 1, fmt.Errorf("no git command given")
 	}
-	if _, err := exec.LookPath("git"); err != nil {
-		return 1, fmt.Errorf("git not found in PATH")
+	exe, err := Executable()
+	if err != nil {
+		return 1, err
 	}
-	cmd := exec.Command("git", quietGitArgs(args)...)
+	cmd := exec.Command(exe, quietGitArgs(args)...)
 	cmd.Dir = dir
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
